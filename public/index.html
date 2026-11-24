@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DilliTransit - Delhi Real-Time Bus Traffic Model & Journey Planner</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/style.css">
+  
+  <!-- Leaflet Map CSS from CDN with local styling fallback -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo" title="DilliTransit">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#ffffff">
+          <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">
+          DilliTransit
+          <span class="badge-hackathon">Transport Stack 2026</span>
+        </div>
+        <div class="brand-tagline">Delhi Real-Time Bus Traffic Model & Multi-Modal Journey Planner</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <!-- Real-Time Telemetry Mode Indicator Pill -->
+      <div id="telemetry-pill" class="telemetry-pill" title="Click to view data provenance & credentials setup">
+        <span class="pulse-dot"></span>
+        <span id="telemetry-status-text">SAMPLE & PHYSICS TELEMETRY</span>
+      </div>
+
+      <!-- Traffic Scenario Simulator Switcher -->
+      <div class="scenario-selector-wrap" title="Simulate different Delhi road network traffic conditions">
+        <span class="scenario-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          Traffic Scenario:
+        </span>
+        <select id="scenario-select" class="scenario-select" aria-label="Select Traffic Scenario">
+          <option value="normal">Normal Midday Traffic</option>
+          <option value="peak_rush">Peak Evening Rush Hour (Bottlenecks)</option>
+          <option value="bottleneck">Incident & Severe Gridlock</option>
+          <option value="off_peak">Off-Peak / Early Morning (Free-Flow)</option>
+        </select>
+      </div>
+
+      <!-- NCMC Fare Calculator Button -->
+      <button id="btn-open-ncmc" class="btn-header" style="border-color:#38bdf8; color:#38bdf8;" title="NCMC Smart Card &amp; Fare Calculator">
+        💳 NCMC Fare
+      </button>
+
+      <!-- Live Emergency SOS Button -->
+      <button id="btn-open-sos" class="btn-header" style="border-color:#ef4444; color:#f87171; background:rgba(239,68,68,0.12);" title="Emergency SOS &amp; Police Station Directory">
+        🚨 SOS &amp; Police
+      </button>
+
+      <!-- Documentation & Credentials Button -->
+      <button id="btn-open-modal" class="btn-header" title="Documentation &amp; OTD Setup">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        Model & OTD Setup
+      </button>
+
+      <!-- Technical Report (Print/Save as PDF) -->
+      <a href="/technical_report_ps1.html" target="_blank" class="btn-header" style="text-decoration:none; color:var(--text-main); border-color:#10b981;" title="Open Technical Note in printable PDF format">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Technical Note (PDF)
+      </a>
+    </div>
+  </header>
+
+  <!-- App Main Content (2-Column Grid) -->
+  <main class="app-container">
+    
+    <!-- Sidebar: Journey Planner & Results -->
+    <aside class="sidebar">
+      <div class="sidebar-scrollable">
+        
+        <!-- Journey Input Form -->
+        <section class="planner-card">
+          <div class="planner-card-title">
+            <span>Plan Delhi Bus Journey</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: normal;">DTC & DIMTS</span>
+          </div>
+
+          <div class="inputs-group">
+            <!-- Origin Row -->
+            <div class="input-row">
+              <span class="input-icon icon-origin" title="Origin">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="12" r="8"/>
+                </svg>
+              </span>
+              <input 
+                type="text" 
+                id="origin-input" 
+                class="stop-input" 
+                placeholder="Enter origin stop or landmark..." 
+                autocomplete="off"
+                aria-label="Origin Bus Stop"
+              />
+              <div id="origin-dropdown" class="autocomplete-dropdown"></div>
+            </div>
+
+            <!-- Swap Button -->
+            <button id="btn-swap" class="btn-swap" title="Swap Origin and Destination" aria-label="Swap Origin and Destination">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </button>
+
+            <!-- Destination Row -->
+            <div class="input-row">
+              <span class="input-icon icon-dest" title="Destination">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+              </span>
+              <input 
+                type="text" 
+                id="dest-input" 
+                class="stop-input" 
+                placeholder="Enter destination stop or landmark..." 
+                autocomplete="off"
+                aria-label="Destination Bus Stop"
+              />
+              <div id="dest-dropdown" class="autocomplete-dropdown"></div>
+            </div>
+          </div>
+
+          <!-- Quick Hub Chips -->
+          <div class="quick-hubs-container">
+            <div class="quick-hubs-label">Major Delhi Transit Hubs:</div>
+            <div class="chips-row">
+              <button class="chip-btn" data-stop-id="KG_ISBT">Kashmere Gate ISBT</button>
+              <button class="chip-btn" data-stop-id="RAJIV_CHOWK">Rajiv Chowk (CP)</button>
+              <button class="chip-btn" data-stop-id="AIIMS">AIIMS / Ring Rd</button>
+              <button class="chip-btn" data-stop-id="ANAND_VIHAR">Anand Vihar ISBT</button>
+              <button class="chip-btn" data-stop-id="DHAULA_KUAN">Dhaula Kuan</button>
+              <button class="chip-btn" data-stop-id="NEHRU_PLACE">Nehru Place</button>
+              <button class="chip-btn" data-stop-id="AEROCITY">Aerocity / Airport</button>
+              <button class="chip-btn" data-stop-id="SAKET">Saket</button>
+            </div>
+          </div>
+
+          <!-- Submit CTA -->
+          <button id="btn-plan" class="btn-primary-plan">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Find Bus Journeys
+          </button>
+        </section>
+
+        <!-- Results Header & Filters -->
+        <div class="results-header">
+          <span id="results-count" class="results-count">Available Journeys</span>
+          <div class="filter-pills">
+            <button class="filter-pill active" data-filter="ALL">All Modes</button>
+            <button class="filter-pill saheli-pill" data-filter="SAHELI_PINK" style="border-color:#ec4899; color:#f472b6;">🌸 Saheli Female Buses</button>
+            <button class="filter-pill" data-filter="METRO_RAPIDX">🚇 Metro / RapidX</button>
+            <button class="filter-pill" data-filter="EV_AC">⚡ Low-Floor / ♿</button>
+            <button class="filter-pill" data-filter="NIGHT_SAFE">🌙 Night Safe (4.8+★)</button>
+            <button class="filter-pill" data-filter="DIRECT">🚌 Direct</button>
+            <button class="filter-pill" data-filter="CHEAPEST">💰 Lowest Fare</button>
+          </div>
+        </div>
+
+        <!-- Journeys List Container -->
+        <div id="journeys-list" class="journeys-list">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <div>Loading Delhi Transit Data...</div>
+          </div>
+        </div>
+
+        <!-- Mathematical Traffic Model Explanation Card -->
+        <div class="model-info-card">
+          <div class="model-header">
+            <div class="model-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              Delhi Bus Traffic Model (PVVE)
+            </div>
+          </div>
+          <div class="model-body">
+            <p><strong>Probe-Vehicle Velocity Estimation:</strong> Operating buses serve as moving sensors across Delhi arterials. Instantaneous velocity is derived from consecutive GPS pings:</p>
+            <div class="formula-box">v_probe = Δdistance / Δtime</div>
+            <p><strong>Separation of Dwell & Delay:</strong> Passenger boarding time at bus stops is isolated so that passenger stops aren't falsely reported as traffic bottlenecks:</p>
+            <div class="formula-box">t_dwell = τ_base (25s) + α_hub (25s)</div>
+            <p><strong>Congestion Factor (CF):</strong> Ratio of arterial free-flow speed to measured corridor bus speed:</p>
+            <div class="formula-box">CF = V_freeflow / V_observed &nbsp;(Green: &lt;1.2, Red: &gt;1.8)</div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Map Section (Interactive Leaflet & Canvas Fallback) -->
+    <section class="map-section">
+      <!-- Leaflet Container -->
+      <div id="map"></div>
+
+      <!-- Built-in Vector Canvas Map Engine (High Reliability Offline Fallback) -->
+      <canvas id="transit-fallback-canvas"></canvas>
+
+      <!-- Floating Map Legend -->
+      <div class="map-legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background:#10b981;"></div>
+          <span>Smooth (&gt;28 km/h)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background:#f59e0b;"></div>
+          <span>Moderate (16-28 km/h)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background:#ef4444;"></div>
+          <span>Bottleneck (&lt;16 km/h)</span>
+        </div>
+        <div class="legend-item">
+          <span style="color:#34d399; font-weight:bold;">●</span>
+          <span>Live Bus</span>
+        </div>
+      </div>
+
+      <!-- Stop Amenities & Women's Safety Filter Bar -->
+      <div class="amenities-floating-bar" title="Toggle transit amenities on the map">
+        <div class="amenity-bar-header">
+          <span class="pulse-dot" style="background-color:#ec4899; box-shadow:0 0 8px #ec4899;"></span>
+          <span style="font-weight:700; color:var(--text-main); font-size:0.75rem;">Nearby Transit Amenities:</span>
+        </div>
+        <div class="amenity-chips-row">
+          <button class="amenity-toggle-chip active" data-category="ALL">All Active</button>
+          <button class="amenity-toggle-chip pink-toilet active" data-category="pink_toilet" title="Women's Safe Sanitation & Hygiene Hubs">
+            🚻 Pink Toilets
+          </button>
+          <button class="amenity-toggle-chip metro active" data-category="metro" title="DMRC First/Last Mile Metro Stations">
+            🚇 Metro
+          </button>
+          <button class="amenity-toggle-chip hospital active" data-category="hospital" title="24/7 Emergency Medical Care & Hospitals">
+            🏥 Hospitals
+          </button>
+          <button class="amenity-toggle-chip cafe active" data-category="cafe" title="Quick Chai, Coffee & Refreshments">
+            ☕ Cafes
+          </button>
+          <button class="amenity-toggle-chip cinema active" data-category="cinema" title="Cinemas & Multiplexes">
+            🎬 Cinemas
+          </button>
+          <button class="amenity-toggle-chip police active" data-category="police" title="Nearest Delhi Police Stations">
+            🚔 Police
+          </button>
+        </div>
+      </div>
+
+      <!-- Floating Controls -->
+      <div class="map-floating-controls">
+        <button id="btn-fit-route" class="map-control-btn" title="Zoom to fit active route">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 3 21 3 21 9"/>
+            <polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/>
+            <line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+          Fit Route
+        </button>
+        <button id="btn-toggle-buses" class="map-control-btn active" title="Toggle real-time bus icons on map">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Live Buses
+        </button>
+      </div>
+
+      <!-- Map Provider Switcher -->
+      <div class="map-provider-switcher" title="Switch map tile provider">
+        <div class="map-provider-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+          </svg>
+          Map:
+        </div>
+        <div class="map-provider-buttons">
+          <button class="map-provider-btn" data-provider="osm" title="OpenStreetMap — open community map data">🗺 OSM</button>
+          <button class="map-provider-btn" data-provider="carto" title="CARTO Voyager — clean road/transit map">🎨 CARTO</button>
+          <button class="map-provider-btn gmaps-btn active" data-provider="gmaps" title="Google Maps — road view">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            Road
+          </button>
+          <button class="map-provider-btn gmaps-btn" data-provider="gmaps_satellite" title="Google Satellite imagery">🛰 Sat</button>
+          <button class="map-provider-btn gmaps-btn" data-provider="gmaps_hybrid" title="Google Hybrid — satellite + road labels">🌍 Hybrid</button>
+        </div>
+        <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">
+          <span id="map-provider-badge">Google Maps (Road)</span>
+        </div>
+      </div>
+
+      <!-- Corridor Traffic Speed Live Ticker -->
+      <div class="corridor-ticker">
+        <div class="ticker-label">
+          <span class="pulse-dot"></span>
+          Corridor Speeds:
+        </div>
+        <div id="ticker-items" class="ticker-items">
+          <!-- Dynamic corridor speed badges -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- App Footer / Telemetry Status Bar -->
+  <footer class="app-footer">
+    <div class="footer-left">
+      <span id="data-source-footer">Data Source: Delhi Open Transit Data (otd.delhi.gov.in) & DTC Route Topology</span>
+      <span>•</span>
+      <span id="last-updated-text">Last telemetry sync: Just now</span>
+    </div>
+    <div class="footer-right">
+      <a href="https://otd.delhi.gov.in/" target="_blank" rel="noopener noreferrer" class="footer-link">Delhi OTD Portal</a>
+      <span>•</span>
+      <a href="https://gtfs.org/documentation/realtime/reference/" target="_blank" rel="noopener noreferrer" class="footer-link">GTFS-RT Spec</a>
+      <span>•</span>
+      <a href="https://delhi.transportstack.in/hackathon/" target="_blank" rel="noopener noreferrer" class="footer-link">Transport Stack Hackathon</a>
+    </div>
+  </footer>
+
+  <!-- Modal: Data Attribution & Official OTD Setup -->
+  <div id="modal-backdrop" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          Data Attribution & Official OTD Setup
+        </div>
+        <button id="btn-close-modal" class="modal-close" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4>1. Current Data Status</h4>
+        <p>This deployment is currently operating in <strong>Sample & Calibrated Physics Mode</strong>. All route lines, stop locations, frequencies, and fares reflect genuine Delhi Transport Corporation (DTC) and DIMTS cluster bus schedules. Real-time GPS pings are computed using the calibrated Probe-Vehicle Velocity Estimator (PVVE).</p>
+
+        <h4>2. How to Connect Official Live Delhi Transit Data</h4>
+        <p>To connect live vehicle positions directly from the Govt. of NCT of Delhi transport department:</p>
+        <ol>
+          <li>Register an account on the <a href="https://otd.delhi.gov.in/" target="_blank" rel="noopener noreferrer" style="color:var(--accent-blue);">Delhi Open Transit Data portal</a> under the <strong>Real Time Data</strong> section.</li>
+          <li>Acquire your private secret API key.</li>
+          <li>Add the key to your environment or <code>.env</code> file:</li>
+        </ol>
+        <div class="code-block">DELHI_OTD_API_KEY="your_secret_otd_api_key_here"</div>
+        <p>The backend will automatically detect the key, authenticate against <code>https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb</code>, and upgrade the interface to <strong>LIVE OTD GTFS FEED</strong>.</p>
+
+        <h4>3. Separation of Measured Data vs. Assumptions</h4>
+        <ul>
+          <li><strong>Measured Data:</strong> Bus vehicle IDs (e.g. DL-1PD-4281), GPS latitude/longitude, instantaneous speeds, and route sequences.</li>
+          <li><strong>Assumptions & Physics Model:</strong> Off-peak free-flow corridor baselines (32–55 km/h), nominal dwell times (25s base + 25s for major interchange hubs), and interchange walking speeds (4.5 km/h).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: NCMC Smart Card & Digital Ticket Savings Calculator -->
+  <div id="ncmc-modal-backdrop" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" style="color:#38bdf8;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2"/>
+            <line x1="2" y1="10" x2="22" y2="10"/>
+          </svg>
+          NCMC (National Common Mobility Card) Smart Calculator
+        </div>
+        <button id="btn-close-ncmc" class="modal-close" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-muted); font-size:0.82rem; margin-bottom:12px;">
+          Calculate seamless multimodal savings across DMRC Metro, DTC Electric Buses, and RapidX Namo Bharat using RuPay NCMC / One Delhi smart card.
+        </p>
+
+        <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:14px;">
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Select Commute Trip Fare:</label>
+          <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
+            <button class="ncmc-preset-btn active" data-fare="25" data-mode="bus">DTC Bus (₹25 AC)</button>
+            <button class="ncmc-preset-btn" data-fare="40" data-mode="metro">DMRC Metro (₹40)</button>
+            <button class="ncmc-preset-btn" data-fare="60" data-mode="multimodal">Metro + Bus + Feeder (₹60)</button>
+            <button class="ncmc-preset-btn" data-fare="80" data-mode="rapidx">RapidX RRTS (₹80)</button>
+          </div>
+        </div>
+
+        <div id="ncmc-result-box" style="background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:14px; text-align:center;">
+          <div style="display:flex; justify-content:space-around; align-items:center;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Cash Fare</div>
+              <div id="ncmc-cash-fare" style="font-size:1.6rem; font-weight:800; color:#f87171;">₹25</div>
+            </div>
+            <div style="font-size:1.5rem; color:var(--text-muted);">➔</div>
+            <div>
+              <div style="font-size:0.75rem; color:#38bdf8; font-weight:700; text-transform:uppercase;">NCMC Smart Card</div>
+              <div id="ncmc-card-fare" style="font-size:1.6rem; font-weight:800; color:#34d399;">₹22</div>
+            </div>
+          </div>
+          <div style="margin-top:10px; font-size:0.85rem; color:#38bdf8; font-weight:700;">
+            💰 Instant Savings: <span id="ncmc-discount-amount">₹3</span> per trip • <span id="ncmc-monthly-amount">~₹132</span> monthly
+          </div>
+        </div>
+
+        <h4 style="margin-top:16px;">Unified NCMC Benefits for Delhi Commuters</h4>
+        <ul>
+          <li><strong>Zero Queues:</strong> Tap &amp; go at DMRC AFC gates, DTC bus conductor ETM machines, and RapidX turnstiles.</li>
+          <li><strong>Interoperability:</strong> One card works on Metro + DTC + E-Rickshaw feeder stands + Parking.</li>
+          <li><strong>Safety &amp; Auditing:</strong> Linked digital transactions allow verifiable journey history and SOS tracking.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Live Fleet SOS & Police Emergency Hub -->
+  <div id="sos-modal-backdrop" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" style="color:#ef4444;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Delhi Transit Emergency SOS &amp; Police Dispatch
+        </div>
+        <button id="btn-close-sos" class="modal-close" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:0.75rem; font-weight:700; color:#f87171; text-transform:uppercase;">Active Transit Vehicle Plate:</div>
+          <div id="sos-fleet-plate" style="font-size:1.4rem; font-weight:800; color:#ffffff; font-family:monospace; margin:4px 0;">DL-1PD-4521</div>
+          <div id="sos-current-stop" style="font-size:0.82rem; color:var(--text-main);">Current Location: Ring Road Corridor near AIIMS Hub</div>
+        </div>
+
+        <h4>Immediate Emergency Hotlines</h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+          <a href="tel:112" class="btn-sos-call" style="background:#ef4444; color:#fff; text-decoration:none; padding:10px; border-radius:6px; font-weight:700; text-align:center; display:block;">
+            📞 Dial 112 (Delhi Police PCR)
+          </a>
+          <a href="tel:1091" class="btn-sos-call" style="background:#ec4899; color:#fff; text-decoration:none; padding:10px; border-radius:6px; font-weight:700; text-align:center; display:block;">
+            🛡️ 1091 (Women Safety)
+          </a>
+        </div>
+
+        <h4>1-Click Live GPS &amp; Fleet Number SOS Sharing</h4>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">
+          Generates an emergency message with live Google Maps coordinate, vehicle number, and nearest police station:
+        </p>
+        <button id="btn-trigger-whatsapp-sos" style="width:100%; background:#25d366; color:#0f172a; font-weight:800; border:none; border-radius:8px; padding:11px; cursor:pointer; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <span>📲 Share Emergency SOS via WhatsApp / SMS</span>
+        </button>
+
+        <h4 style="margin-top:14px;">Nearest Police Stations along Corridor</h4>
+        <div id="sos-police-list" style="font-size:0.8rem; color:var(--text-muted); max-height:140px; overflow-y:auto;">
+          <!-- Dynamically filled with nearest police stations -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Movie-Style Bus Seat Selection & Anti-Chaos Digital Token -->
+  <div id="seat-modal-backdrop" class="modal-backdrop">
+    <div class="modal-card modal-card-wide" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title" style="color:#38bdf8;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2">
+            <path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/>
+            <path d="M3 11v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H7v-2a2 2 0 0 0-4 0z"/>
+            <path d="M5 18v2"/>
+            <path d="M19 18v2"/>
+          </svg>
+          Interactive Seat Selection (Movie-Theater Layout)
+        </div>
+        <button id="btn-close-seat" class="modal-close" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+          <div>
+            <div id="seat-bus-title" style="font-weight:700; color:var(--text-main); font-size:0.9rem;">Bus Route 502 (Electric AC Low-Floor)</div>
+            <div id="seat-bus-plate" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">Fleet: DL-1PD-4521</div>
+          </div>
+          <div id="seat-avail-counter" style="text-align:right;">
+            <span style="background:rgba(52,211,153,0.15); color:#34d399; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; border:1px solid rgba(52,211,153,0.3);">
+              14 Available
+            </span>
+          </div>
+        </div>
+
+        <!-- Seating Legend -->
+        <div class="seat-legend-bar">
+          <div class="legend-item"><span class="legend-box available"></span> Available</div>
+          <div class="legend-item"><span class="legend-box selected"></span> Selected</div>
+          <div class="legend-item"><span class="legend-box occupied"></span> Occupied</div>
+          <div class="legend-item"><span class="legend-box female-pink"></span> Women Section (Seats W1-W8)</div>
+          <div class="legend-item"><span class="legend-box accessible"></span> Senior/♿</div>
+        </div>
+
+        <!-- Bus Physical Layout Graphic -->
+        <div class="bus-interior-chassis">
+          <div class="bus-driver-cabin">
+            <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Front • Driver Cabin</span>
+            <div style="font-size:1.1rem;">🕹️ 🚪 Front Entry</div>
+          </div>
+
+          <!-- Dynamic Seat Grid Container -->
+          <div id="bus-seat-grid" class="bus-seat-grid">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div class="bus-rear-label">Rear • Emergency Exit</div>
+        </div>
+
+        <!-- Passenger Details & Selection Confirmation Panel -->
+        <div id="seat-booking-panel" class="seat-booking-panel" style="margin-top:14px; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Passenger Name</label>
+              <input id="seat-passenger-name" type="text" class="input-text" value="Ananya Sharma" style="margin-top:3px; padding:7px 10px; font-size:0.8rem;" />
+            </div>
+            <div>
+              <label style="font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Passenger Category</label>
+              <select id="seat-passenger-gender" class="scenario-select" style="margin-top:3px; width:100%; padding:7px 10px; font-size:0.8rem;">
+                <option value="Female">Female (Delhi Govt ₹0 Pink Pass)</option>
+                <option value="Male">General Commuter (₹25)</option>
+                <option value="Senior">Senior Citizen / Divyang (₹25)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed var(--border-color); padding-top:10px;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Current Selection:</div>
+              <div id="seat-summary-label" style="font-weight:800; font-size:0.95rem; color:#38bdf8;">Seat W2 (Women Priority Section)</div>
+              <div id="seat-fare-label" style="font-size:0.75rem; color:#34d399; font-weight:700;">Fare: ₹0 (Free Pink Ticket Eligible)</div>
+            </div>
+            <button id="btn-confirm-seat" class="btn-primary" style="padding:10px 18px; font-size:0.85rem; font-weight:700;">
+              🔒 Lock Seat &amp; Get Boarding Pass
+            </button>
+          </div>
+        </div>
+
+        <!-- Digital Boarding Pass Display (Hidden by default, shown on confirm) -->
+        <div id="digital-boarding-pass" class="digital-boarding-pass" style="display:none; margin-top:14px; background:linear-gradient(135deg, #0f172a, #1e293b); border:2px solid #34d399; border-radius:10px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">
+            <div>
+              <div style="font-size:0.68rem; color:#34d399; font-weight:800; letter-spacing:0.08em; text-transform:uppercase;">Official Anti-Chaos Digital Boarding Pass</div>
+              <div id="pass-pnr" style="font-size:1.1rem; font-weight:800; color:#fff; font-family:monospace;">PNR: DT26-84920</div>
+              <div id="pass-token-id" style="font-size:0.75rem; color:var(--text-muted);">Token: DL-592819</div>
+            </div>
+            <div id="pass-seat-badge" style="background:#ec4899; color:#fff; font-size:1.5rem; font-weight:900; padding:6px 14px; border-radius:8px; box-shadow:0 0 14px rgba(236,72,153,0.5);">
+              W2
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; font-size:0.78rem;">
+            <div><span style="color:var(--text-muted);">Passenger:</span> <strong id="pass-name">Ananya Sharma</strong></div>
+            <div><span style="color:var(--text-muted);">Category:</span> <strong id="pass-cat">Women Priority (Pink Pass)</strong></div>
+            <div><span style="color:var(--text-muted);">Vehicle Plate:</span> <strong id="pass-fleet">DL-1PD-4521</strong></div>
+            <div><span style="color:var(--text-muted);">Fare Paid:</span> <strong id="pass-fare" style="color:#34d399;">₹0 (Free Pink Pass)</strong></div>
+          </div>
+
+          <div style="background:rgba(52,211,153,0.12); border:1px solid rgba(52,211,153,0.3); border-radius:6px; padding:8px 10px; font-size:0.72rem; color:#34d399;">
+            🛡️ <strong>Anti-Chaos Guarantee:</strong> Seat is officially reserved for you. Simply show this digital pass on your phone to board without door-crowd pushing!
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS from CDN (Loads asynchronously, fallback canvas handles zero-network situations) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Application Script -->
+  <script src="/app.js"></script>
+</body>
+</html>

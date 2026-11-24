@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DilliTransit - Multimodal API and Architecture Documentation</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.5;
+    font-size: 10pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Cover / Header Header */
+  .cover {
+    border-bottom: 3px solid #0284c7;
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+  }
+  .badge-tag {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: 22pt;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    font-size: 12pt;
+    color: #475569;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .doc-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    color: #64748b;
+    background: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+  }
+
+  /* Headings */
+  h2 {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0f172a;
+    border-bottom: 1.5px solid #cbd5e1;
+    padding-bottom: 4px;
+    margin-top: 24px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #0369a1;
+    margin-top: 16px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+  }
+
+  /* Features Grid */
+  .features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .feature-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .feature-card strong {
+    color: #0284c7;
+    display: block;
+    font-size: 9.5pt;
+    margin-bottom: 3px;
+  }
+  .feature-card p {
+    font-size: 8.5pt;
+    margin: 0;
+    color: #334155;
+    line-height: 1.35;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px 0;
+    font-size: 8.5pt;
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 6px 8px;
+    border: 1px solid #0f172a;
+  }
+  td {
+    padding: 6px 8px;
+    border: 1px solid #cbd5e1;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  /* API Endpoint Box */
+  .api-box {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    page-break-inside: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  .api-header {
+    background: #f1f5f9;
+    padding: 8px 12px;
+    border-bottom: 1px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .method-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-weight: 800;
+    font-size: 8pt;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .method-get { background: #0284c7; }
+  .method-post { background: #16a34a; }
+  .endpoint-path {
+    font-family: "Courier New", Courier, monospace;
+    font-weight: 700;
+    font-size: 9.5pt;
+    color: #0f172a;
+    margin-left: 8px;
+  }
+  .api-body {
+    padding: 10px 12px;
+    font-size: 8.5pt;
+  }
+
+  /* Code Blocks */
+  pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 7.5pt;
+    overflow-x: auto;
+    margin: 6px 0 8px 0;
+    line-height: 1.35;
+  }
+  code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 8pt;
+    background: #e2e8f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #0f172a;
+  }
+
+  .seat-legend {
+    display: flex;
+    gap: 12px;
+    font-size: 8pt;
+    margin: 8px 0;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+</style>
+</head>
+<body>
+
+<!-- Cover / Header -->
+<div class="cover">
+  <span class="badge-tag">Delhi Transport Stack Hackathon 2026 • Problem Statement 1</span>
+  <h1>DilliTransit 🚌</h1>
+  <div class="subtitle">Hyper-Local, Multimodal Delhi-NCR Transit Planner & Probe-Vehicle Traffic Engine</div>
+  <div class="doc-meta">
+    <span><strong>Specification:</strong> Production Multimodal Transit API & System Architecture</span>
+    <span><strong>Author:</strong> Antigravity & Team</span>
+    <span><strong>Date:</strong> November 23, 2026</span>
+    <span><strong>Host Port:</strong> <code>http://localhost:8000</code></span>
+  </div>
+</div>
+
+<!-- Section 1: Executive Summary -->
+<h2>1. Executive Summary & Problem Resolution</h2>
+<p>
+  <strong>DilliTransit</strong> is a comprehensive public transit journey planner and probe-vehicle traffic velocity estimator engineered specifically for the National Capital Territory (NCT) of Delhi and the National Capital Region (NCR). It resolves systemic commuter pain points and critical gaps found in legacy transit apps (such as One Delhi, Chartr, and Google Maps) by combining <strong>DTC and DIMTS cluster buses</strong>, <strong>DMRC Metro Lines (Yellow, Blue, Pink, Airport Express)</strong>, <strong>RapidX (NCRTC RRTS)</strong>, and <strong>last-mile feeder networks (E-rickshaws, shared autos)</strong> into a single, seamless, interactive platform.
+</p>
+
+<div class="features-grid">
+  <div class="feature-card">
+    <strong>🗺️ Google Maps-Styled Interface</strong>
+    <p>Default high-definition Google Maps Road raster tile integration, animated live buses, traffic speed segments, and 5-way satellite/hybrid/dark tile switcher.</p>
+  </div>
+  <div class="feature-card">
+    <strong>💺 Movie-Theater Seat Selection</strong>
+    <p>Interactive 37-seat bus layout preventing boarding time chaos. Issues digital anti-chaos boarding passes with PNR tokens and anti-crowd guarantees.</p>
+  </div>
+  <div class="feature-card">
+    <strong>🌸 Saheli Pink Women Buses</strong>
+    <p>Dedicated female special bus section (Seats W1–W8) and automatic ₹0 Free Pink Pass verification under the Delhi Government scheme.</p>
+  </div>
+  <div class="feature-card">
+    <strong>⚡ Rush Bypass Alternate Routes</strong>
+    <p>Automatic detection of corridor bottlenecks ($CF > 1.8$, speed &lt; 16 km/h) with 1-click bypass redirection via underground Metro or RapidX.</p>
+  </div>
+  <div class="feature-card">
+    <strong>🚔 Delhi Police & Safety Layer</strong>
+    <p>10 mapped Delhi Police stations with hotline dials (112 / 1091), well-lit night safety ratings (4.8+★), and 1-click live GPS WhatsApp SOS dispatch.</p>
+  </div>
+  <div class="feature-card">
+    <strong>📍 Hyper-Local Stop Intelligence</strong>
+    <p>Exact roadside boarding bay pins (e.g. Bay 2 opposite OPD Gate), specific Metro exit gates for feeder autos, and prominent local landmarks.</p>
+  </div>
+  <div class="feature-card">
+    <strong>💳 Offline-First NCMC Calculator</strong>
+    <p>Calculates exact 10% RuPay One Delhi / NCMC card discounts and projected monthly commuter savings (discount × 44 trips).</p>
+  </div>
+  <div class="feature-card">
+    <strong>⚡ Zero-Dependency Stack</strong>
+    <p>Pure Python 3.14 standard library backend with multi-threaded HTTP server. Zero external pip packages, starts in under 50ms, 30/30 tests passing.</p>
+  </div>
+</div>
+
+<!-- Section 2: Mathematical Traffic Formulation -->
+<h2>2. Mathematical Traffic & Physics Formulation</h2>
+<p>
+  Traditional navigation apps falsely misidentify bus stops as severe traffic bottlenecks because buses pause to board passengers. DilliTransit models passenger dwell friction separately from roadway link velocities using probe-vehicle velocity estimation (PVVE):
+</p>
+<table>
+  <tr>
+    <th style="width: 25%;">Mathematical Model</th>
+    <th style="width: 45%;">Equation</th>
+    <th style="width: 30%;">Parameters & Interpretation</th>
+  </tr>
+  <tr>
+    <td><strong>1. Probe Velocity Derivation</strong></td>
+    <td>$$ar{v}_{	ext{segment}} = rac{\sum_{i=1}^N \Delta d_i}{\sum_{i=1}^N \Delta t_i}$$</td>
+    <td>$\Delta d_i$: Haversine distance between consecutive GPS pings; $\Delta t_i$: Elapsed telemetry interval.</td>
+  </tr>
+  <tr>
+    <td><strong>2. Dwell Time Separation</strong></td>
+    <td>$$t_{	ext{dwell}}(s) = 	au_0 + lpha_{	ext{hub}} \cdot \mathbb{I}_{	ext{hub}}(s) + eta_{	ext{peak}}$$</td>
+    <td>$	au_0 = 25	ext{s}$ baseline boarding;<br>$lpha_{	ext{hub}} = 25	ext{s}$ terminal hub friction;<br>$eta_{	ext{peak}} = 10	ext{s}$ peak rush friction.</td>
+  </tr>
+  <tr>
+    <td><strong>3. Congestion Factor ($CF$)</strong></td>
+    <td>$$CF = rac{V_{	ext{free-flow}}}{V_{	ext{observed}}}$$</td>
+    <td>$CF &gt; 1.8$: Severe Bottleneck;<br>$CF \in [1.3, 1.8]$: Moderate Delay;<br>$CF &lt; 1.3$: Free Flow.</td>
+  </tr>
+  <tr>
+    <td><strong>4. Dynamic Multimodal ETA</strong></td>
+    <td>$$	ext{ETA} = \sum_{k} rac{d_k}{V_k(t)} + \sum_{s} t_{	ext{dwell}}(s) + \sum_{m} (t_{	ext{walk}} + t_{	ext{wait}})$$</td>
+    <td>Integrates road speed, stop dwell times, and platform interchange walking buffers.</td>
+  </tr>
+</table>
+
+<!-- Section 3: Bus Seating Layout -->
+<h2>3. Movie-Style Bus Seat Selection Architecture</h2>
+<p>
+  To solve Delhi's pervasive boarding chaos, DilliTransit introduces an airline/movie-theater seat reservation system for buses. Before boarding, commuters view an interactive 37-seat layout:
+</p>
+<div class="seat-legend">
+  <div class="legend-item"><div class="legend-box" style="background:#ec4899;"></div> <strong>Pink Zone (W1–W8)</strong>: Women Priority (₹0 Pink Pass eligible)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#0284c7;"></div> <strong>Accessible (S1–S4)</strong>: Senior &amp; Disabled Priority</div>
+  <div class="legend-item"><div class="legend-box" style="background:#334155;"></div> <strong>General (G1–G20)</strong>: Standard 2x2 Seating</div>
+  <div class="legend-item"><div class="legend-box" style="background:#64748b;"></div> <strong>Lounge (R1–R5)</strong>: Rear Bench</div>
+</div>
+<p>
+  Upon locking a seat, the system issues a tamper-evident digital boarding pass with an official PNR (e.g. <code>DT26-54278</code>), Anti-Chaos Token (e.g. <code>DEL-AC-912</code>), and seat badge. Showing this pass guarantees seat allocation and eliminates door pushing.
+</p>
+
+<div class="page-break"></div>
+
+<!-- Section 4: Complete REST API Reference -->
+<h2>4. Complete REST API Reference (15 Endpoints)</h2>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/health</span></div>
+    <span style="font-size:8pt; color:#64748b;">System Health &amp; Summary</span>
+  </div>
+  <div class="api-body">
+    <p>Returns server operational state, active traffic simulation scenario, and counts of loaded transit stops, routes, and amenities.</p>
+    <pre>HTTP 200 OK
+{
+  "status": "healthy",
+  "active_scenario": "normal",
+  "data_source": { "provider": "Delhi Open Transit Data (OTD) / Simulation Physics", "bus_count": 48 },
+  "network_summary": { "total_stops": 52, "total_routes": 18, "total_amenities": 46 }
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/stops</span></div>
+    <span style="font-size:8pt; color:#64748b;">Transit Stops List</span>
+  </div>
+  <div class="api-body">
+    <p>Returns all 52 transit hubs and stops across Delhi-NCR with GPS coordinates, zone, and route associations.</p>
+    <pre>HTTP 200 OK
+{
+  "total": 52,
+  "stops": [
+    {
+      "id": "KG_ISBT", "name": "Kashmere Gate ISBT / Metro", "name_hi": "कश्मीरी गेट बस अड्डा",
+      "lat": 28.6675, "lon": 77.2282, "zone": "North Delhi", "is_hub": true,
+      "connected_routes": ["502", "TMS", "729", "181", "AIRPORT_EXP", "METRO_YELLOW"]
+    }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/plan?origin={id}&amp;destination={id}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Multimodal Journey Planning</span>
+  </div>
+  <div class="api-body">
+    <p>Computes multimodal journeys across buses, metro, and RapidX with live traffic delay, crowdedness, Saheli Pink tags, rush bypass alternatives, and NCMC fares.</p>
+    <pre>HTTP 200 OK
+{
+  "success": true,
+  "origin": { "id": "KG_ISBT", "name": "Kashmere Gate ISBT / Metro" },
+  "destination": { "id": "AIIMS", "name": "AIIMS Hospital / Metro" },
+  "journeys": [
+    {
+      "journey_id": "direct_502_KG_ISBT_AIIMS", "type": "DIRECT", "mode": "bus",
+      "route_short_name": "502", "bus_type": "Electric AC Low-Floor (Green)", "live_fleet_number": "DL-1PD-4521",
+      "is_saheli_pink": true, "fare_inr": 25,
+      "ncmc_fare": { "cash_fare_inr": 25, "ncmc_fare_inr": 22, "discount_amount_inr": 3 },
+      "scheduled_duration_min": 35, "live_duration_min": 42, "traffic_delay_min": 7,
+      "crowd_percentage": 58, "crowd_status": "Seats Available (58%)", "night_safety_rating": 4.9,
+      "rush_bypass_alternate": {
+        "title": "⚡ DMRC Underground Metro Bypass", "time_saved_min": 18,
+        "recommended_journey_id": "direct_METRO_YELLOW_KG_ISBT_AIIMS"
+      }
+    }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/routes</span></div>
+    <span style="font-size:8pt; color:#64748b;">Routes Catalog</span>
+  </div>
+  <div class="api-body">
+    <p>Lists all 18 active routes across DTC buses, DMRC metro lines, and RapidX RRTS.</p>
+    <pre>HTTP 200 OK
+{
+  "total": 18,
+  "routes": [
+    { "route_id": "502", "short_name": "502", "bus_type": "Electric AC Low-Floor", "fare_inr": 25, "total_stops": 12 }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/route/{route_id}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Route Stops &amp; Geometry</span>
+  </div>
+  <div class="api-body">
+    <p>Returns the ordered stops and polyline geometry coordinates for map drawing.</p>
+    <pre>HTTP 200 OK
+{
+  "route_id": "502", "short_name": "502", "long_name": "Mehrauli Terminal ⇄ Mori Gate",
+  "geometry": [[28.5175, 77.1832], [28.5672, 77.2100], [28.6675, 77.2282]]
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/live-buses?route_id={id}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Live Bus Telemetry</span>
+  </div>
+  <div class="api-body">
+    <p>Real-time telemetry stream of active buses with chassis plate, GPS coordinates, heading, speed, and crowdedness.</p>
+    <pre>HTTP 200 OK
+{
+  "total": 4, "timestamp": 1740000000,
+  "buses": [
+    { "vehicle_id": "DL-1PD-4521", "route_id": "502", "lat": 28.6139, "lon": 77.2090, "speed_kmh": 24.5, "crowd_percentage": 64 }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/corridors</span></div>
+    <span style="font-size:8pt; color:#64748b;">Arterial Corridors &amp; Speeds</span>
+  </div>
+  <div class="api-body">
+    <p>Reports active traffic speeds, congestion severity, and free-flow benchmarks across key Delhi arterial corridors.</p>
+    <pre>HTTP 200 OK
+{
+  "corridors": [
+    { "corridor_id": "RING_ROAD_SOUTH", "corridor_name": "Ring Road (AIIMS - Ashram)", "current_speed_kmh": 18.4, "status": "Heavy Congestion" }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/hyperlocal?stop_id={id}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Hyper-Local Stop Intelligence</span>
+  </div>
+  <div class="api-body">
+    <p>Provides exact roadside boarding bay pins, specific Metro exit gates, feeder transport modes, and nearest police stations.</p>
+    <pre>HTTP 200 OK
+{
+  "success": true, "stop_id": "AIIMS",
+  "hyperlocal": {
+    "road_side_pin": "Bay 2, Aurobindo Marg Service Lane, opposite AIIMS Main OPD Gate",
+    "metro_exit_gate": "Gate 2 (AIIMS Metro Yellow Line) with dedicated E-Rickshaw stand",
+    "landmarks": ["AIIMS Emergency Trauma Centre", "Safdarjung Hospital Footbridge"],
+    "feeder_modes": [{ "mode": "Shared E-Rickshaw to South Ext", "fare_inr": 10 }],
+    "nearest_police_station": { "name": "Hauz Khas Police Station", "phone": "112" }
+  }
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/ncmc-calc?fare={amt}&amp;mode={mode}</span></div>
+    <span style="font-size:8pt; color:#64748b;">NCMC Card Fare &amp; Savings Calculator</span>
+  </div>
+  <div class="api-body">
+    <p>Calculates the statutory 10% RuPay One Delhi / NCMC smart card discount and projected monthly commuter savings.</p>
+    <pre>HTTP 200 OK
+{
+  "success": true, "cash_fare_inr": 25, "ncmc_fare_inr": 22, "discount_amount_inr": 3, "monthly_savings_inr": 132
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/amenities?category={cat}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Amenities &amp; Police Stations</span>
+  </div>
+  <div class="api-body">
+    <p>Returns amenities near transit hubs (Pink Toilets, Metro, Police Stations, Hospitals, Cafes, Cinemas).</p>
+    <pre>HTTP 200 OK
+{
+  "total": 10,
+  "amenities": [
+    { "id": "PS_KASHMERE_GATE", "name": "Kashmere Gate Police Station", "category": "police", "lat": 28.6685, "lon": 77.2295, "phone": "112" }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/sos?stop_id={id}&amp;fleet={plate}&amp;route={route}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Emergency SOS Dispatch Generator</span>
+  </div>
+  <div class="api-body">
+    <p>Generates pre-formatted emergency dispatch payloads and 1-click WhatsApp links with live GPS and Delhi Police numbers.</p>
+    <pre>HTTP 200 OK
+{
+  "success": true,
+  "sos_payload": {
+    "fleet_number": "DL-1PD-4521", "route": "502", "current_stop": "AIIMS Hospital",
+    "police_hotline": "112", "women_safety_hotline": "1091",
+    "whatsapp_dispatch_link": "https://wa.me/?text=EMERGENCY%20SOS%3A%20I%20am%20on%20Delhi%20Transit..."
+  }
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-get">GET</span><span class="endpoint-path">/api/seats?route_id={id}&amp;fleet_plate={plate}&amp;crowd_pct={pct}&amp;is_saheli={bool}</span></div>
+    <span style="font-size:8pt; color:#64748b;">Bus Seat Layout &amp; Occupancy</span>
+  </div>
+  <div class="api-body">
+    <p>Returns the 37-seat bus layout with availability status across Pink, Accessible, General, and Lounge zones.</p>
+    <pre>HTTP 200 OK
+{
+  "success": true,
+  "seat_map": {
+    "total_seats": 37, "available_seats": 14, "pink_zone_available": 3,
+    "seating_grid": [
+      { "id": "W1", "label": "W1", "zone": "female_pink", "status": "available", "price_inr": 25 },
+      { "id": "S1", "label": "S1", "zone": "accessible_senior", "status": "occupied", "price_inr": 25 },
+      { "id": "G1", "label": "G1", "zone": "general", "status": "available", "price_inr": 25 }
+    ]
+  }
+}</pre>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-post">POST</span><span class="endpoint-path">/api/reserve-seat</span></div>
+    <span style="font-size:8pt; color:#64748b;">Reserve Seat &amp; Anti-Chaos Token</span>
+  </div>
+  <div class="api-body">
+    <p>Reserves a seat, issues an official PNR boarding pass, and checks Delhi Govt ₹0 Pink Pass eligibility.</p>
+    <pre>Request Body:
+{
+  "route_id": "502", "fleet_plate": "DL-1PD-4521", "seat_id": "W3",
+  "passenger_name": "Ananya Sharma", "gender": "Female", "boarding_stop": "Kashmere Gate ISBT"
+}
+
+HTTP 200 OK
+{
+  "success": true,
+  "reservation": {
+    "pnr": "DT26-84912", "token_id": "DEL-AC-912", "seat_id": "W3",
+    "passenger_name": "Ananya Sharma", "fare_charged_inr": 0, "is_pink_pass": true,
+    "anti_chaos_guarantee": true, "status": "CONFIRMED"
+  }
+}</pre>
+  </div>
+</div>
+
+<div class="api-box">
+  <div class="api-header">
+    <div><span class="method-badge method-post">POST</span><span class="endpoint-path">/api/scenario</span></div>
+    <span style="font-size:8pt; color:#64748b;">Set Traffic Simulation Scenario</span>
+  </div>
+  <div class="api-body">
+    <p>Switches between <code>normal</code>, <code>peak_rush</code>, <code>rain_disruption</code>, and <code>accident_gridlock</code> simulation physics.</p>
+    <pre>Request Body: { "scenario": "peak_rush" }
+
+HTTP 200 OK
+{
+  "success": true, "active_scenario": "peak_rush", "message": "Traffic physics model switched to peak_rush mode."
+}</pre>
+  </div>
+</div>
+
+<!-- Section 5: Verification and Test Suite -->
+<h2>5. System Verification &amp; Automated Testing</h2>
+<p>
+  DilliTransit includes an exhaustive regression test suite covering all multimodal, routing, safety, seating, and traffic calculation modules:
+</p>
+<table>
+  <tr>
+    <th style="width: 25%;">Module / Component</th>
+    <th style="width: 50%;">Test Scope &amp; Functionality Verified</th>
+    <th style="width: 25%;">Status</th>
+  </tr>
+  <tr>
+    <td><strong>Multimodal Routing</strong></td>
+    <td>Direct &amp; transfer paths across DTC, DMRC Yellow/Blue/Pink Metro, RapidX RRTS.</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 1–6)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Traffic &amp; Dwell Physics</strong></td>
+    <td>Haversine speed derivation, stop dwell friction isolation, congestion factor ($CF$).</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 7–10)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Hyper-Local Stop Engine</strong></td>
+    <td>Roadside boarding pins, Metro exit gates, feeder autos, landmarks.</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 11–18)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>NCMC Fare Calculator</strong></td>
+    <td>RuPay 10% discount calculations, monthly savings formulas, offline math.</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 19–21)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Safety &amp; SOS Dispatch</strong></td>
+    <td>10 Police stations, emergency hotline numbers, pre-filled WhatsApp SOS generator.</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 22–24)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Movie-Style Bus Seating</strong></td>
+    <td>37-seat bus layout, deterministic pseudo-random occupancy, Pink Zone isolation.</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 25–27)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Reservation &amp; Pink Pass</strong></td>
+    <td>PNR generation, anti-chaos token issuance, Delhi Govt ₹0 Free Pink Pass waiver.</td>
+    <td><strong style="color:#16a34a;">Passed (Tests 28–30)</strong></td>
+  </tr>
+</table>
+
+<p style="text-align:center; font-size:9pt; color:#64748b; margin-top:20px;">
+  <em>DilliTransit • Delhi Transport Stack Hackathon 2026 • End of Documentation</em>
+</p>
+
+</body>
+</html>

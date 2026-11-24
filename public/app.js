@@ -159,7 +159,7 @@
     }
   }
 
-  async function searchJourneys() {
+  async function searchJourneys(targetJourneyId = null) {
     if (!state.originStop || !state.destStop) {
       alert("Please select both a Delhi origin and destination from the suggestions.");
       return;
@@ -186,7 +186,10 @@
       renderJourneysList();
 
       if (state.journeys.length > 0) {
-        selectJourney(state.journeys[0].journey_id);
+        const toSelect = targetJourneyId && state.journeys.some(j => j.journey_id === targetJourneyId)
+          ? targetJourneyId
+          : state.journeys[0].journey_id;
+        selectJourney(toSelect);
       }
     } catch (err) {
       console.warn("Backend API unreachable, utilizing client-side transit routing engine:", err);
@@ -436,6 +439,11 @@
                 </svg>
                 ${journey.route_short_name}
               </span>
+              ${journey.ai_badge ? `
+                <span class="ai-card-badge" style="background:${journey.ai_badge_color || '#8b5cf6'}22; border:1px solid ${journey.ai_badge_color || '#8b5cf6'}; color:${journey.ai_badge_color || '#c4b5fd'};">
+                  ${journey.ai_badge} • ${journey.ai_score || 90}%
+                </span>
+              ` : ''}
               ${modeBadge}
               ${!isDirect ? `<span class="transfer-badge">1 Transfer</span>` : `<span class="tag-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;">Direct</span>`}
               ${tagsHtml}
@@ -451,6 +459,13 @@
             <span class="ncmc-save-pill">⚡ Save ₹${ncmcSave} with NCMC / RuPay One Delhi Card</span>
             ${journey.is_wheelchair_accessible ? `<span class="ncmc-save-pill" style="color:#34d399; border-color:rgba(52,211,153,0.3);">♿ 100% Accessible</span>` : ''}
           </div>
+
+          <!-- AI Pareto Multi-Objective Reasoning Tag -->
+          ${journey.ai_rationale && journey.ai_rationale.length > 0 ? `
+            <div class="ai-rationale-tag" title="AI Pareto Multi-Objective Reasoning">
+              <span>✨ <strong>AI Insight:</strong> ${journey.ai_rationale[0]}</span>
+            </div>
+          ` : ''}
 
           <div class="journey-metrics-grid">
             <div class="duration-wrap">
@@ -825,10 +840,6 @@
     // Insert tile at the bottom of the layer stack
     state.mapLayers.baseTile.addTo(state.leafletMap);
     state.mapLayers.baseTile.bringToBack();
-
-    // Update map provider label
-    const badge = document.getElementById("map-provider-badge");
-    if (badge) badge.textContent = provider.label;
   }
 
   function renderAllStopsOnMap() {
@@ -1029,7 +1040,7 @@
               </svg>
             </div>
             <div style="position:absolute; top:-12px; background:#0f172a; border:1px solid #34d399; color:#34d399; font-size:9px; font-weight:700; padding:1px 4px; border-radius:3px; white-space:nowrap;">
-              ${bus.route_short_name}
+              ${bus.route_short_name || bus.route_name || bus.route_id || "Bus"}
             </div>
           </div>
         `,
@@ -1221,19 +1232,35 @@
       }
     });
 
-    // Swap Origin and Destination
-    elements.btnSwap.addEventListener("click", () => {
-      const tempStop = state.originStop;
-      state.originStop = state.destStop;
-      state.destStop = tempStop;
+    // Swap Origin and Destination (Two-Way Route Toggle)
+    if (elements.btnSwap) {
+      elements.btnSwap.addEventListener("click", () => {
+        // 1. Swap the visible text in input fields
+        const tempText = elements.originInput.value;
+        elements.originInput.value = elements.destInput.value;
+        elements.destInput.value = tempText;
 
-      elements.originInput.value = state.originStop ? state.originStop.name : "";
-      elements.destInput.value = state.destStop ? state.destStop.name : "";
+        // 2. Swap the state stop objects
+        const tempStop = state.originStop;
+        state.originStop = state.destStop;
+        state.destStop = tempStop;
 
-      if (state.originStop && state.destStop) {
-        searchJourneys();
-      }
-    });
+        // 3. Fallback resolve if stop object wasn't set yet
+        if (!state.originStop && elements.originInput.value) {
+          state.originStop = findStopFromPhrase(elements.originInput.value) ||
+            state.allStops.find(s => s.name.toLowerCase().includes(elements.originInput.value.toLowerCase().trim()));
+        }
+        if (!state.destStop && elements.destInput.value) {
+          state.destStop = findStopFromPhrase(elements.destInput.value) ||
+            state.allStops.find(s => s.name.toLowerCase().includes(elements.destInput.value.toLowerCase().trim()));
+        }
+
+        // 4. Immediately trigger two-way route recalculation
+        if (elements.originInput.value && elements.destInput.value) {
+          searchJourneys();
+        }
+      });
+    }
 
     // Plan Button
     elements.btnPlan.addEventListener("click", searchJourneys);
@@ -1332,15 +1359,6 @@
       });
     });
 
-    // ── Map Provider Switcher ────────────────────────────────────────────────
-    document.querySelectorAll(".map-provider-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const provider = btn.getAttribute("data-provider");
-        document.querySelectorAll(".map-provider-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        switchMapProvider(provider);
-      });
-    });
 
     // Modal Events
     if (elements.btnOpenModal) {
@@ -1422,6 +1440,128 @@
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
       });
     }
+
+    // ── Google Maps-Style Voice Command Listeners ───────────────────────────
+    const btnVoiceInput = document.getElementById("btn-voice-input");
+    const btnVoiceCommand = document.getElementById("btn-voice-command");
+    const voiceModalBackdrop = document.getElementById("voice-modal-backdrop");
+    const btnCloseVoice = document.getElementById("btn-close-voice");
+    const btnVoiceRelisten = document.getElementById("btn-voice-relisten");
+    const btnVoiceAudioToggle = document.getElementById("btn-voice-audio-toggle");
+
+    if (btnVoiceInput) {
+      btnVoiceInput.addEventListener("click", () => openVoiceModal());
+    }
+    if (btnVoiceCommand) {
+      btnVoiceCommand.addEventListener("click", () => openVoiceModal());
+    }
+    if (btnCloseVoice) {
+      btnCloseVoice.addEventListener("click", () => closeVoiceModal());
+    }
+    if (voiceModalBackdrop) {
+      voiceModalBackdrop.addEventListener("click", (e) => {
+        if (e.target === voiceModalBackdrop) closeVoiceModal();
+      });
+    }
+    if (btnVoiceRelisten) {
+      btnVoiceRelisten.addEventListener("click", () => {
+        if (voiceState.isListening) stopListening();
+        else startListening();
+      });
+    }
+    if (btnVoiceAudioToggle) {
+      btnVoiceAudioToggle.addEventListener("click", () => {
+        voiceState.audioFeedback = !voiceState.audioFeedback;
+        if (voiceState.audioFeedback) {
+          btnVoiceAudioToggle.textContent = "🔊 Voice On";
+          btnVoiceAudioToggle.classList.remove("muted");
+        } else {
+          btnVoiceAudioToggle.textContent = "🔇 Voice Muted";
+          btnVoiceAudioToggle.classList.add("muted");
+        }
+      });
+    }
+
+    // Voice quick suggestion chips
+    const btnVoiceExecute = document.getElementById("btn-voice-execute");
+    const voiceLiveInput = document.getElementById("voice-live-input");
+    if (btnVoiceExecute) {
+      btnVoiceExecute.addEventListener("click", () => {
+        const val = voiceLiveInput ? voiceLiveInput.value.trim() : "";
+        if (val) processVoiceCommand(val);
+      });
+    }
+    if (voiceLiveInput) {
+      voiceLiveInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const val = voiceLiveInput.value.trim();
+          if (val) processVoiceCommand(val);
+        }
+      });
+    }
+
+    document.querySelectorAll(".voice-suggestion-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const cmd = chip.getAttribute("data-cmd");
+        if (cmd) {
+          processVoiceCommand(cmd);
+        }
+      });
+    });
+
+    initVoiceRecognition();
+
+    // ── AI Transit Copilot Listeners ─────────────────────────────────────────
+    const btnOpenAiCopilot = document.getElementById("btn-open-ai-copilot");
+    const btnAiPredictToggle = document.getElementById("btn-ai-predict-toggle");
+    const aiModalBackdrop = document.getElementById("ai-modal-backdrop");
+    const btnCloseAi = document.getElementById("btn-close-ai");
+    const btnSubmitAi = document.getElementById("btn-submit-ai");
+    const aiPromptInput = document.getElementById("ai-prompt-input");
+
+    if (btnOpenAiCopilot) {
+      btnOpenAiCopilot.addEventListener("click", () => openAiCopilotModal());
+    }
+    if (btnAiPredictToggle) {
+      btnAiPredictToggle.addEventListener("click", () => {
+        openAiCopilotModal("What is the current traffic condition on Ring Road and where is the bottleneck?");
+      });
+    }
+    if (btnCloseAi && aiModalBackdrop) {
+      btnCloseAi.addEventListener("click", () => closeAiCopilotModal());
+    }
+    if (aiModalBackdrop) {
+      aiModalBackdrop.addEventListener("click", (e) => {
+        if (e.target === aiModalBackdrop) closeAiCopilotModal();
+      });
+    }
+    if (btnSubmitAi && aiPromptInput) {
+      btnSubmitAi.addEventListener("click", () => {
+        const text = aiPromptInput.value.trim();
+        if (text) submitAiQuery(text);
+      });
+      aiPromptInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const text = aiPromptInput.value.trim();
+          if (text) submitAiQuery(text);
+        }
+      });
+    }
+
+    // AI Preset Chips
+    document.querySelectorAll(".ai-preset-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const p = chip.getAttribute("data-prompt");
+        if (p) {
+          if (aiPromptInput) aiPromptInput.value = p;
+          submitAiQuery(p);
+        }
+      });
+    });
+
+    // Poll AI Congestion Predictor
+    fetchAiPredictiveCongestion();
   }
 
   window.openSosModal = function(journeyId = null) {
@@ -1681,7 +1821,639 @@
     });
   }
 
-  // Global window hooks for popup interactions
+  /* --------------------------------------------------------------------------
+     Google Maps-Style Voice Command Module
+     Built on W3C Web Speech API (SpeechRecognition + SpeechSynthesis)
+     -------------------------------------------------------------------------- */
+  const voiceState = {
+    recognition: null,
+    isListening: false,
+    audioFeedback: true,
+    supported: false,
+    autoCloseTimeout: null
+  };
+
+  function initVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      voiceState.supported = true;
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.lang = "en-IN";
+
+      rec.onstart = () => {
+        voiceState.isListening = true;
+        setVoiceUIListening(true, "Listening... Speak your command");
+      };
+
+      rec.onresult = (event) => {
+        let interim = "";
+        let final = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        const text = (final || interim).trim();
+        const liveInput = document.getElementById("voice-live-input");
+        if (liveInput && text) {
+          liveInput.value = text;
+        }
+        if (final && final.trim().length > 0) {
+          processVoiceCommand(final.trim());
+        }
+      };
+
+      rec.onerror = (event) => {
+        console.warn("Voice recognition error:", event.error);
+        voiceState.isListening = false;
+        let msg = "Microphone error: " + event.error;
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          msg = "Microphone permission required. Tap any command chip below to test!";
+        } else if (event.error === "no-speech") {
+          msg = "No speech detected. Tap the mic button to try again!";
+        }
+        setVoiceUIListening(false, msg);
+      };
+
+      rec.onend = () => {
+        voiceState.isListening = false;
+        setVoiceUIListening(false, "Ready. Tap microphone to speak again.");
+      };
+
+      voiceState.recognition = rec;
+    } else {
+      voiceState.supported = false;
+    }
+  }
+
+  function setVoiceUIListening(isListening, statusText) {
+    const micBtn = document.getElementById("btn-voice-relisten");
+    const micContainer = document.querySelector(".voice-mic-container");
+    const statusLabel = document.getElementById("voice-status-text");
+
+    if (micBtn) {
+      if (isListening) micBtn.classList.add("listening");
+      else micBtn.classList.remove("listening");
+    }
+    if (micContainer) {
+      if (isListening) micContainer.classList.add("active");
+      else micContainer.classList.remove("active");
+    }
+    if (statusLabel && statusText) {
+      statusLabel.textContent = statusText;
+    }
+  }
+
+  function openVoiceModal() {
+    const modal = document.getElementById("voice-modal-backdrop");
+    if (!modal) return;
+    modal.classList.add("open");
+
+    const liveInput = document.getElementById("voice-live-input");
+    const actionStatus = document.getElementById("voice-action-status");
+    if (liveInput) {
+      liveInput.value = "";
+      liveInput.placeholder = "Listening... or type destination (e.g. AIIMS)";
+    }
+    if (actionStatus) {
+      actionStatus.style.display = "none";
+      actionStatus.textContent = "";
+    }
+
+    startListening();
+  }
+
+  function closeVoiceModal() {
+    stopListening();
+    if (voiceState.autoCloseTimeout) {
+      clearTimeout(voiceState.autoCloseTimeout);
+      voiceState.autoCloseTimeout = null;
+    }
+    const modal = document.getElementById("voice-modal-backdrop");
+    if (modal) modal.classList.remove("open");
+  }
+
+  function startListening() {
+    if (!voiceState.supported || !voiceState.recognition) {
+      setVoiceUIListening(false, "Tap any command chip below to execute!");
+      return;
+    }
+    try {
+      if (voiceState.isListening) {
+        voiceState.recognition.stop();
+      }
+      voiceState.recognition.start();
+    } catch (e) {
+      console.warn("Could not start speech recognition:", e);
+    }
+  }
+
+  function stopListening() {
+    if (voiceState.recognition && voiceState.isListening) {
+      try {
+        voiceState.recognition.stop();
+      } catch (e) {}
+    }
+    voiceState.isListening = false;
+    setVoiceUIListening(false, "Ready. Tap microphone to speak.");
+  }
+
+  function speakFeedback(text) {
+    if (!voiceState.audioFeedback || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.lang = "en-IN";
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("Speech synthesis error:", e);
+    }
+  }
+
+  function setVoiceActionStatus(message, isSuccess = true) {
+    const el = document.getElementById("voice-action-status");
+    if (el) {
+      el.innerHTML = (isSuccess ? "✅ " : "⚠️ ") + message;
+      el.className = isSuccess ? "voice-action-status success" : "voice-action-status warning";
+      el.style.display = "block";
+    }
+  }
+
+  function closeVoiceModalAfterDelay(ms = 2200) {
+    if (voiceState.autoCloseTimeout) clearTimeout(voiceState.autoCloseTimeout);
+    voiceState.autoCloseTimeout = setTimeout(() => {
+      closeVoiceModal();
+    }, ms);
+  }
+
+  function findStopFromPhrase(phrase) {
+    if (!phrase || !state.allStops || state.allStops.length === 0) return null;
+    const clean = phrase.toLowerCase().trim()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+      .replace(/\s+/g, " ");
+
+    // 1. Direct match on stop.name or stop.id
+    for (const stop of state.allStops) {
+      const sName = stop.name.toLowerCase();
+      if (clean === sName || clean.includes(sName) || sName.includes(clean)) {
+        return stop;
+      }
+    }
+
+    // 2. Comprehensive Delhi landmark & hub aliases
+    const aliases = {
+      "rajiv chowk": "RAJIV_CHOWK",
+      "connaught place": "RAJIV_CHOWK",
+      "cp": "RAJIV_CHOWK",
+      "kashmere gate": "KG_ISBT",
+      "kashmiri gate": "KG_ISBT",
+      "isbt": "KG_ISBT",
+      "aiims": "AIIMS",
+      "anand vihar": "ANAND_VIHAR",
+      "dhaula kuan": "DHAULA_KUAN",
+      "nehru place": "NEHRU_PLACE",
+      "aerocity": "AEROCITY",
+      "airport": "AEROCITY",
+      "saket": "SAKET",
+      "chandni chowk": "CHANDNI_CHOWK",
+      "hauz khas": "HAUZ_KHAS",
+      "red fort": "RED_FORT",
+      "lal qila": "RED_FORT",
+      "karol bagh": "KAROL_BAGH",
+      "lajpat nagar": "LAJPAT_NAGAR",
+      "dwarka": "DWARKA_SEC21",
+      "sec 21": "DWARKA_SEC21",
+      "delhi haat": "INA_DELHI_HAAT",
+      "ina": "INA_DELHI_HAAT",
+      "india gate": "INDIA_GATE",
+      "noida": "NOIDA_SEC18",
+      "cyber hub": "CYBER_HUB",
+      "cyber city": "CYBER_HUB",
+      "gurgaon": "CYBER_HUB",
+      "gurugram": "CYBER_HUB"
+    };
+
+    for (const [alias, id] of Object.entries(aliases)) {
+      if (clean.includes(alias)) {
+        return state.allStops.find(s => s.id === id) || null;
+      }
+    }
+
+    // 3. Significant word search
+    const words = clean.split(" ").filter(w => w.length > 3);
+    for (const w of words) {
+      const matched = state.allStops.find(s => s.name.toLowerCase().includes(w));
+      if (matched) return matched;
+    }
+
+    return null;
+  }
+
+  function clickAmenity(cat) {
+    const chip = document.querySelector(`.amenity-toggle-chip[data-category="${cat}"]`);
+    if (chip) chip.click();
+  }
+
+  function processVoiceCommand(cmdText) {
+    if (!cmdText) return;
+    const text = cmdText.trim().toLowerCase();
+    const liveInput = document.getElementById("voice-live-input");
+    if (liveInput) liveInput.value = cmdText;
+
+    // 1. Dual destination routing: "from [A] to [B]" or "[A] to [B]"
+    const fromTo = text.match(/(?:route\s+|directions\s+)?(?:from\s+)?(.+?)\s+(?:to|towards)\s+(.+)/i);
+    if (fromTo && fromTo[1] && fromTo[2]) {
+      const originQuery = fromTo[1].replace(/^(navigate|go|take me|route|plan|trip)\s+/i, "").trim();
+      const destQuery = fromTo[2].trim();
+      const originStop = findStopFromPhrase(originQuery);
+      const destStop = findStopFromPhrase(destQuery);
+
+      if (originStop && destStop) {
+        state.originStop = originStop;
+        state.destStop = destStop;
+        elements.originInput.value = originStop.name;
+        elements.destInput.value = destStop.name;
+        searchJourneys();
+        const msg = `Navigating from ${originStop.name} to ${destStop.name}`;
+        setVoiceActionStatus(msg, true);
+        speakFeedback(msg);
+        closeVoiceModalAfterDelay();
+        return;
+      }
+    }
+
+    // 2. Single destination: "go to [X]", "take me to [X]", "navigate to [X]"
+    const singleDest = text.match(/(?:go\s+to|take\s+me\s+to|navigate\s+to|directions\s+to|head\s+to|reach|plan\s+to|destination\s+is?)\s+(.+)/i);
+    if (singleDest && singleDest[1]) {
+      const destStop = findStopFromPhrase(singleDest[1]);
+      if (destStop) {
+        if (!state.originStop) {
+          state.originStop = state.allStops.find(s => s.id === "KG_ISBT") || state.allStops[0];
+          elements.originInput.value = state.originStop.name;
+        }
+        state.destStop = destStop;
+        elements.destInput.value = destStop.name;
+        searchJourneys();
+        const msg = `Navigating to ${destStop.name}`;
+        setVoiceActionStatus(msg, true);
+        speakFeedback(msg);
+        closeVoiceModalAfterDelay();
+        return;
+      }
+    }
+
+    // 3. Stop search / Locate: "where is [X]", "find [X]", "show [X] stop"
+    const locateMatch = text.match(/(?:where\s+is|find|show|locate|search)\s+(.+)/i);
+    if (locateMatch && locateMatch[1]) {
+      const phrase = locateMatch[1].replace(/\s+(stop|station|bus\s+stop|metro|hub)$/i, "");
+      const stop = findStopFromPhrase(phrase);
+      if (stop) {
+        if (state.leafletMap) {
+          state.leafletMap.setView([stop.lat, stop.lon], 16);
+          if (state.stopMarkers && state.stopMarkers[stop.id]) {
+            state.stopMarkers[stop.id].openPopup();
+          }
+        }
+        const msg = `Found ${stop.name}. Centering map.`;
+        setVoiceActionStatus(msg, true);
+        speakFeedback(msg);
+        closeVoiceModalAfterDelay();
+        return;
+      }
+    }
+
+    // 4. Live Bus Tracking: "track bus 502", "show bus 729", "yellow line"
+    if (text.includes("track") || text.includes("bus") || text.includes("route")) {
+      const numMatch = text.match(/([0-9]{3})/i);
+      if (numMatch) {
+        const query = numMatch[1];
+        const matched = (state.routes || []).find(r => r.id.includes(query) || (r.short_name && r.short_name.includes(query)));
+        if (matched) {
+          if (elements.scenarioSelect) elements.scenarioSelect.value = matched.id;
+          state.selectedRouteId = matched.id;
+          fetchLiveBuses(matched.id);
+          const msg = `Tracking live buses for ${matched.short_name || matched.id}`;
+          setVoiceActionStatus(msg, true);
+          speakFeedback(msg);
+          closeVoiceModalAfterDelay();
+          return;
+        }
+      }
+      if (text.includes("yellow line") || text.includes("yellow")) {
+        if (elements.scenarioSelect) elements.scenarioSelect.value = "METRO_YELLOW";
+        state.selectedRouteId = "METRO_YELLOW";
+        fetchLiveBuses("METRO_YELLOW");
+        const msg = "Tracking DMRC Yellow Line metro trains";
+        setVoiceActionStatus(msg, true);
+        speakFeedback(msg);
+        closeVoiceModalAfterDelay();
+        return;
+      }
+      if (text.includes("live") || text.includes("fleet")) {
+        if (elements.btnToggleBuses) elements.btnToggleBuses.click();
+        const msg = "Toggled live fleet view";
+        setVoiceActionStatus(msg, true);
+        speakFeedback(msg);
+        closeVoiceModalAfterDelay();
+        return;
+      }
+    }
+
+    // 5. Pink Bus / Saheli Women Safety: "pink bus", "saheli bus"
+    if (text.includes("pink") || text.includes("saheli") || text.includes("women")) {
+      const btnSaheli = document.getElementById("btn-saheli-pink");
+      if (btnSaheli) btnSaheli.click();
+      const msg = "Filtered dedicated Saheli Pink buses for women safety";
+      setVoiceActionStatus(msg, true);
+      speakFeedback(msg);
+      closeVoiceModalAfterDelay();
+      return;
+    }
+
+    // 6. Amenities: "metro", "hospital", "pink toilet", "police"
+    if (text.includes("metro")) {
+      clickAmenity("metro");
+      const msg = "Showing nearby DMRC Metro stations";
+      setVoiceActionStatus(msg, true);
+      speakFeedback(msg);
+      closeVoiceModalAfterDelay();
+      return;
+    }
+    if (text.includes("hospital") || text.includes("doctor") || text.includes("medical")) {
+      clickAmenity("hospital");
+      const msg = "Showing nearby 24/7 hospitals and trauma centres";
+      setVoiceActionStatus(msg, true);
+      speakFeedback(msg);
+      closeVoiceModalAfterDelay();
+      return;
+    }
+    if (text.includes("toilet") || text.includes("washroom") || text.includes("restroom")) {
+      clickAmenity("pink_toilet");
+      const msg = "Showing women's safe Pink Toilets";
+      setVoiceActionStatus(msg, true);
+      speakFeedback(msg);
+      closeVoiceModalAfterDelay();
+      return;
+    }
+    if (text.includes("police") || text.includes("safety") || text.includes("emergency")) {
+      clickAmenity("police");
+      const msg = "Showing nearest Delhi Police stations and emergency hotlines";
+      setVoiceActionStatus(msg, true);
+      speakFeedback(msg);
+      closeVoiceModalAfterDelay();
+      return;
+    }
+
+    // 7. Map Controls: "zoom in", "zoom out", "fit route", "reset map"
+    if (text.includes("zoom in")) {
+      if (state.leafletMap) state.leafletMap.zoomIn();
+      setVoiceActionStatus("Zoomed in", true);
+      speakFeedback("Zooming in");
+      return;
+    }
+    if (text.includes("zoom out")) {
+      if (state.leafletMap) state.leafletMap.zoomOut();
+      setVoiceActionStatus("Zoomed out", true);
+      speakFeedback("Zooming out");
+      return;
+    }
+    if (text.includes("fit") || text.includes("fit route")) {
+      if (elements.btnFitRoute) elements.btnFitRoute.click();
+      setVoiceActionStatus("Fitting map to active route", true);
+      speakFeedback("Fitting map to route");
+      closeVoiceModalAfterDelay();
+      return;
+    }
+    if (text.includes("reset") || text.includes("center")) {
+      if (state.leafletMap) state.leafletMap.setView(DELHI_CENTER, 12);
+      setVoiceActionStatus("Reset map to Delhi overview", true);
+      speakFeedback("Reset map to Delhi overview");
+      closeVoiceModalAfterDelay();
+      return;
+    }
+
+    // 8. Map Tile Provider: "satellite", "road", "hybrid"
+    if (text.includes("satellite")) {
+      switchMapProvider("gmaps_satellite");
+      setVoiceActionStatus("Switched to Google Satellite view", true);
+      speakFeedback("Switched to Google Satellite view");
+      closeVoiceModalAfterDelay();
+      return;
+    }
+    if (text.includes("road")) {
+      switchMapProvider("gmaps");
+      setVoiceActionStatus("Switched to Google Road view", true);
+      speakFeedback("Switched to Google Road view");
+      closeVoiceModalAfterDelay();
+      return;
+    }
+    if (text.includes("hybrid")) {
+      switchMapProvider("gmaps_hybrid");
+      setVoiceActionStatus("Switched to Google Hybrid view", true);
+      speakFeedback("Switched to Google Hybrid view");
+      closeVoiceModalAfterDelay();
+      return;
+    }
+
+    // 9. Book / Select Seat: "seat", "book seat"
+    if (text.includes("seat") || text.includes("booking") || text.includes("reserve")) {
+      if (window.openSeatModal) {
+        window.openSeatModal("J_YELLOW_01");
+      }
+      setVoiceActionStatus("Opened bus seat reservation layout", true);
+      speakFeedback("Opening seat reservation");
+      closeVoiceModalAfterDelay();
+      return;
+    }
+
+    // 10. Direct stop name fallback
+    const directStop = findStopFromPhrase(text);
+    if (directStop) {
+      if (!state.originStop) {
+        state.originStop = state.allStops.find(s => s.id === "KG_ISBT") || state.allStops[0];
+        elements.originInput.value = state.originStop.name;
+      }
+      state.destStop = directStop;
+      elements.destInput.value = directStop.name;
+      searchJourneys();
+      const msg = `Navigating to ${directStop.name}`;
+      setVoiceActionStatus(msg, true);
+      speakFeedback(msg);
+      closeVoiceModalAfterDelay();
+      return;
+    }
+
+    // Unrecognized
+    const notUnderstood = `Command "${cmdText}" not recognized. Try saying "Go to Rajiv Chowk" or "Track bus 502".`;
+    setVoiceActionStatus(notUnderstood, false);
+    speakFeedback("Sorry, I did not catch that. Please try again.");
+  }
+
+  /* --------------------------------------------------------------------------
+     AI Transit Copilot & Bayesian Congestion Client
+     -------------------------------------------------------------------------- */
+  function openAiCopilotModal(initialQuery = "") {
+    const modal = document.getElementById("ai-modal-backdrop");
+    if (!modal) return;
+    modal.classList.add("open");
+    const input = document.getElementById("ai-prompt-input");
+    if (input) {
+      if (initialQuery) {
+        input.value = initialQuery;
+        submitAiQuery(initialQuery);
+      }
+      setTimeout(() => input.focus(), 150);
+    }
+  }
+
+  function closeAiCopilotModal() {
+    const modal = document.getElementById("ai-modal-backdrop");
+    if (modal) modal.classList.remove("open");
+  }
+
+  async function submitAiQuery(queryText) {
+    const container = document.getElementById("ai-response-container");
+    const loader = document.getElementById("ai-loading-state");
+    if (loader) loader.style.display = "flex";
+
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: queryText,
+          origin: state.originStop ? state.originStop.id : null,
+          destination: state.destStop ? state.destStop.id : null
+        })
+      });
+      const data = await res.json();
+      if (loader) loader.style.display = "none";
+      renderAiResponse(data);
+    } catch (err) {
+      console.warn("AI Copilot request error:", err);
+      if (loader) loader.style.display = "none";
+      if (container) {
+        container.innerHTML = `
+          <div style="padding:16px; background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:8px; color:#fca5a5; font-size:0.85rem;">
+            ⚠️ Could not reach AI Copilot service. Please try again.
+          </div>
+        `;
+      }
+    }
+  }
+
+  function renderAiResponse(data) {
+    const container = document.getElementById("ai-response-container");
+    if (!container) return;
+
+    const j = data.recommended_journey;
+    const origin = data.origin || {};
+    const dest = data.destination || {};
+
+    let journeyCardHtml = "";
+    if (j) {
+      journeyCardHtml = `
+        <div class="ai-journey-apply-card">
+          <div>
+            <div style="font-size:0.68rem; color:#8b5cf6; font-weight:800; text-transform:uppercase;">✨ ${j.ai_badge || "AI Optimal Route"} (${j.ai_score || 90}% Match)</div>
+            <div style="font-weight:700; font-size:0.95rem; color:#f8fafc; margin-top:2px;">${j.route_short_name} (${origin.name} ➔ ${dest.name})</div>
+            <div style="font-size:0.75rem; color:#94a3b8; margin-top:3px;">
+              ⏱️ ~${j.live_duration_min} min • 💰 ₹${j.fare_inr} • 💺 ${j.crowd_status || "Normal Crowd"}
+            </div>
+          </div>
+          <button class="btn-ai-apply" onclick="window.applyAiPlan('${origin.id}', '${dest.id}', '${j.journey_id}')">
+            ⚡ Apply &amp; Navigate
+          </button>
+        </div>
+      `;
+    }
+
+    const followUps = (data.suggested_questions || []).map(q => `
+      <button class="ai-preset-chip" onclick="document.getElementById('ai-prompt-input').value='${q}'; window.submitAiQuery('${q}')">
+        💬 "${q}"
+      </button>
+    `).join("");
+
+    container.innerHTML = `
+      <div class="ai-result-box">
+        <div class="ai-summary-card">
+          <div class="ai-summary-header">
+            <span style="font-size:0.75rem; font-weight:700; color:#c4b5fd;">🧠 ${data.engine || "DilliTransit AI"}</span>
+            <span class="ai-confidence-pill">🎯 ${data.ai_confidence_pct || 94}% Confidence</span>
+          </div>
+          <div style="font-size:0.88rem; line-height:1.5;">
+            ${formatAiMarkdown(data.ai_summary || "")}
+          </div>
+        </div>
+
+        ${journeyCardHtml}
+
+        <div style="margin-top:6px;">
+          <div style="font-size:0.72rem; font-weight:700; color:#94a3b8; margin-bottom:6px;">💡 Suggested Follow-ups:</div>
+          <div class="ai-presets-row">
+            ${followUps}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function formatAiMarkdown(text) {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+  }
+
+  window.applyAiPlan = function(originId, destId, journeyId) {
+    const oStop = state.allStops.find(s => s.id === originId);
+    const dStop = state.allStops.find(s => s.id === destId);
+    if (oStop) {
+      state.originStop = oStop;
+      elements.originInput.value = oStop.name;
+    }
+    if (dStop) {
+      state.destStop = dStop;
+      elements.destInput.value = dStop.name;
+    }
+    closeAiCopilotModal();
+    searchJourneys(journeyId);
+  };
+
+  window.submitAiQuery = submitAiQuery;
+  window.openAiCopilotModal = openAiCopilotModal;
+
+  async function fetchAiPredictiveCongestion() {
+    try {
+      const res = await fetch("/api/ai/predict");
+      const data = await res.json();
+      const el = document.getElementById("ai-quick-jam-text");
+      if (!el || !data.predictions || data.predictions.length === 0) return;
+
+      const critical = data.predictions.filter(p => p.recommend_bypass);
+      if (critical.length > 0) {
+        el.textContent = `${critical[0].jam_percentage}% Jam (${critical[0].corridor_name.split("(")[0].trim()})`;
+        el.style.color = "#ef4444";
+      } else {
+        const avgProb = (data.predictions.reduce((acc, p) => acc + p.jam_percentage, 0) / data.predictions.length).toFixed(1);
+        el.textContent = `${avgProb}% Jam Risk (Free-Flow)`;
+        el.style.color = "#10b981";
+      }
+    } catch (e) {
+      console.warn("Could not fetch AI congestion prediction:", e);
+    }
+  }
+
+  // Global window hooks for popup and voice interactions
+  window.openVoiceModal = openVoiceModal;
+  window.closeVoiceModal = closeVoiceModal;
+  window.processVoiceCommand = processVoiceCommand;
   window.selectJourney = selectJourney;
   window.selectAsOrigin = function (stopId) {
     const stop = state.allStops.find(s => s.id === stopId);

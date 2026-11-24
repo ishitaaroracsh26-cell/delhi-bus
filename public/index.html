@@ -23,19 +23,12 @@
       <div>
         <div class="brand-title">
           DilliTransit
-          <span class="badge-hackathon">Transport Stack 2026</span>
         </div>
         <div class="brand-tagline">Delhi Real-Time Bus Traffic Model & Multi-Modal Journey Planner</div>
       </div>
     </div>
 
     <div class="header-controls">
-      <!-- Real-Time Telemetry Mode Indicator Pill -->
-      <div id="telemetry-pill" class="telemetry-pill" title="Click to view data provenance & credentials setup">
-        <span class="pulse-dot"></span>
-        <span id="telemetry-status-text">SAMPLE & PHYSICS TELEMETRY</span>
-      </div>
-
       <!-- Traffic Scenario Simulator Switcher -->
       <div class="scenario-selector-wrap" title="Simulate different Delhi road network traffic conditions">
         <span class="scenario-label">
@@ -61,28 +54,6 @@
       <button id="btn-open-sos" class="btn-header" style="border-color:#ef4444; color:#f87171; background:rgba(239,68,68,0.12);" title="Emergency SOS &amp; Police Station Directory">
         🚨 SOS &amp; Police
       </button>
-
-      <!-- Documentation & Credentials Button -->
-      <button id="btn-open-modal" class="btn-header" title="Documentation &amp; OTD Setup">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="16" x2="12" y2="12"/>
-          <line x1="12" y1="8" x2="12.01" y2="8"/>
-        </svg>
-        Model & OTD Setup
-      </button>
-
-      <!-- Technical Report (Print/Save as PDF) -->
-      <a href="/technical_report_ps1.html" target="_blank" class="btn-header" style="text-decoration:none; color:var(--text-main); border-color:#10b981;" title="Open Technical Note in printable PDF format">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-          <polyline points="10 9 9 9 8 9"/>
-        </svg>
-        Technical Note (PDF)
-      </a>
     </div>
   </header>
 
@@ -119,11 +90,13 @@
               <div id="origin-dropdown" class="autocomplete-dropdown"></div>
             </div>
 
-            <!-- Swap Button -->
-            <button id="btn-swap" class="btn-swap" title="Swap Origin and Destination" aria-label="Swap Origin and Destination">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
+            <!-- Swap / Two-Way Route Button -->
+            <button id="btn-swap" class="btn-swap" title="Two-way Route / Swap Origin &amp; Destination" aria-label="Two-way Route / Swap Origin &amp; Destination">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 4v16"/>
+                <path d="M3 16l4 4 4-4"/>
+                <path d="M17 20V4"/>
+                <path d="M13 8l4-4 4 4"/>
               </svg>
             </button>
 
@@ -142,6 +115,14 @@
                 autocomplete="off"
                 aria-label="Destination Bus Stop"
               />
+              <!-- Google Maps Style Voice Search Mic Button -->
+              <button id="btn-voice-input" class="btn-voice-mic" type="button" title="Speak to navigate (Google Maps Voice Command)" aria-label="Voice Search">
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                  <path fill="#34A853" d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                  <path fill="#FBBC05" d="M12 18.92c-1.8 0-3.44-.73-4.64-1.92l-1.42 1.42C7.57 19.95 9.66 20.75 12 20.75v-1.83z"/>
+                </svg>
+              </button>
               <div id="dest-dropdown" class="autocomplete-dropdown"></div>
             </div>
           </div>
@@ -276,6 +257,18 @@
 
       <!-- Floating Controls -->
       <div class="map-floating-controls">
+        <button id="btn-ai-predict-toggle" class="map-control-btn ai-predict-btn" title="AI Bayesian Congestion Forecast & Bottleneck Predictor">
+          <span class="ai-dot-pulse"></span>
+          AI Jam Forecast: <strong id="ai-quick-jam-text" style="color:#10b981;">Analyzing...</strong>
+        </button>
+        <button id="btn-voice-command" class="map-control-btn voice-command-btn" title="Google Maps Voice Command (Click to speak)">
+          <svg width="14" height="14" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path fill="#34A853" d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            <path fill="#FBBC05" d="M12 18.92c-1.8 0-3.44-.73-4.64-1.92l-1.42 1.42C7.57 19.95 9.66 20.75 12 20.75v-1.83z"/>
+          </svg>
+          Voice
+        </button>
         <button id="btn-fit-route" class="map-control-btn" title="Zoom to fit active route">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 3 21 3 21 9"/>
@@ -294,39 +287,6 @@
         </button>
       </div>
 
-      <!-- Map Provider Switcher -->
-      <div class="map-provider-switcher" title="Switch map tile provider">
-        <div class="map-provider-label">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-          </svg>
-          Map:
-        </div>
-        <div class="map-provider-buttons">
-          <button class="map-provider-btn" data-provider="osm" title="OpenStreetMap — open community map data">🗺 OSM</button>
-          <button class="map-provider-btn" data-provider="carto" title="CARTO Voyager — clean road/transit map">🎨 CARTO</button>
-          <button class="map-provider-btn gmaps-btn active" data-provider="gmaps" title="Google Maps — road view">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            Road
-          </button>
-          <button class="map-provider-btn gmaps-btn" data-provider="gmaps_satellite" title="Google Satellite imagery">🛰 Sat</button>
-          <button class="map-provider-btn gmaps-btn" data-provider="gmaps_hybrid" title="Google Hybrid — satellite + road labels">🌍 Hybrid</button>
-        </div>
-        <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">
-          <span id="map-provider-badge">Google Maps (Road)</span>
-        </div>
-      </div>
-
-      <!-- Corridor Traffic Speed Live Ticker -->
-      <div class="corridor-ticker">
-        <div class="ticker-label">
-          <span class="pulse-dot"></span>
-          Corridor Speeds:
-        </div>
-        <div id="ticker-items" class="ticker-items">
-          <!-- Dynamic corridor speed badges -->
-        </div>
-      </div>
     </section>
 
   </main>
@@ -591,6 +551,180 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       Google Maps Voice Command Modal Dialog
+       ========================================================================= -->
+  <div id="voice-modal-backdrop" class="modal-backdrop voice-modal-backdrop">
+    <div class="modal-card voice-modal-card">
+      <div class="modal-header voice-modal-header">
+        <div class="modal-title voice-modal-title">
+          <svg width="22" height="22" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path fill="#34A853" d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            <path fill="#FBBC05" d="M12 18.92c-1.8 0-3.44-.73-4.64-1.92l-1.42 1.42C7.57 19.95 9.66 20.75 12 20.75v-1.83z"/>
+          </svg>
+          Google Maps Voice Command
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button id="btn-voice-audio-toggle" class="btn-voice-audio" title="Toggle audio spoken response">🔊 Voice On</button>
+          <button id="btn-close-voice" class="modal-close" aria-label="Close voice command">&times;</button>
+        </div>
+      </div>
+
+      <div class="voice-modal-body">
+        <!-- Interactive listening visualizer -->
+        <div class="voice-mic-container">
+          <button id="btn-voice-relisten" class="voice-big-mic-btn" title="Tap to speak">
+            <svg width="44" height="44" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path fill="#34A853" d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              <path fill="#FBBC05" d="M12 18.92c-1.8 0-3.44-.73-4.64-1.92l-1.42 1.42C7.57 19.95 9.66 20.75 12 20.75v-1.83z"/>
+            </svg>
+            <div class="voice-pulse-ring r1"></div>
+            <div class="voice-pulse-ring r2"></div>
+            <div class="voice-pulse-ring r3"></div>
+          </button>
+          
+          <div class="voice-equalizer-bars" id="voice-equalizer-bars">
+            <span class="eq-bar bar-blue"></span>
+            <span class="eq-bar bar-red"></span>
+            <span class="eq-bar bar-yellow"></span>
+            <span class="eq-bar bar-green"></span>
+            <span class="eq-bar bar-blue"></span>
+          </div>
+
+          <div id="voice-status-text" class="voice-status-text">Listening for transit command...</div>
+        </div>
+
+        <!-- Real-time transcript & speech destination input -->
+        <div class="voice-transcript-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div class="voice-transcript-hint">What your mic hears (Speak aloud now):</div>
+            <div id="voice-mic-badge" class="voice-mic-badge" style="font-size:0.68rem; color:#34d399; font-weight:700;">🟢 Mic Live</div>
+          </div>
+          
+          <div class="voice-input-flex">
+            <input 
+              type="text" 
+              id="voice-live-input" 
+              class="voice-live-input" 
+              placeholder="Listening... say 'I want to go to AIIMS' or 'Saket'..."
+              autocomplete="off"
+            />
+            <button id="btn-voice-execute" class="btn-voice-execute" title="Navigate to this destination">Navigate ➔</button>
+          </div>
+          
+          <div id="voice-action-status" class="voice-action-status"></div>
+        </div>
+
+        <!-- Clickable suggestion chips for testing or voice ideas -->
+        <div class="voice-suggestions-section">
+          <div class="voice-suggestions-label">💡 Say aloud or tap to execute:</div>
+          <div class="voice-chips-grid">
+            <button class="voice-suggestion-chip" data-cmd="Go to Rajiv Chowk">📍 "Go to Rajiv Chowk"</button>
+            <button class="voice-suggestion-chip" data-cmd="Take me to AIIMS">📍 "Take me to AIIMS"</button>
+            <button class="voice-suggestion-chip" data-cmd="Route from Kashmere Gate to Saket">🔄 "Route from Kashmere Gate to Saket"</button>
+            <button class="voice-suggestion-chip" data-cmd="Track bus 502">🚌 "Track bus 502"</button>
+            <button class="voice-suggestion-chip" data-cmd="Where is Dhaula Kuan">🔍 "Where is Dhaula Kuan"</button>
+            <button class="voice-suggestion-chip" data-cmd="Show Pink bus">🌸 "Show Pink bus"</button>
+            <button class="voice-suggestion-chip" data-cmd="Show metro stations">🚇 "Show metro stations"</button>
+            <button class="voice-suggestion-chip" data-cmd="Show nearest hospital">🏥 "Show nearest hospital"</button>
+            <button class="voice-suggestion-chip" data-cmd="Switch to satellite">🛰️ "Switch to satellite"</button>
+            <button class="voice-suggestion-chip" data-cmd="Zoom in">➕ "Zoom in"</button>
+            <button class="voice-suggestion-chip" data-cmd="Book a seat">💺 "Book a seat"</button>
+          </div>
+        </div>
+
+        <div class="voice-engine-badge">
+          🎙️ <strong>Web Speech API Engine:</strong> Natural speech recognition (<code>webkitSpeechRecognition</code>) with spoken turn-by-turn audio feedback (<code>speechSynthesis</code>).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       DilliTransit AI Transit Copilot Modal Dialog
+       Multi-Objective Pareto Routing, Bayesian Jam Predictor & Commuter Advisor
+       ========================================================================= -->
+  <div id="ai-modal-backdrop" class="modal-backdrop ai-modal-backdrop">
+    <div class="modal-card ai-modal-card">
+      <div class="modal-header ai-modal-header">
+        <div class="modal-title ai-modal-title">
+          <span class="ai-sparkle-icon">✨</span>
+          <span>DilliTransit AI Copilot</span>
+          <span class="ai-engine-chip">NLP + Bayesian Engine</span>
+        </div>
+        <button id="btn-close-ai" class="modal-close" aria-label="Close AI Copilot">&times;</button>
+      </div>
+
+      <div class="ai-modal-body">
+        <!-- AI Input Bar -->
+        <div class="ai-search-box">
+          <div class="ai-input-wrapper">
+            <span class="ai-input-prefix">✨</span>
+            <input 
+              type="text" 
+              id="ai-prompt-input" 
+              class="ai-prompt-input" 
+              placeholder="Ask anything (e.g., 'Safest female route from CP to Saket after 8 PM', 'Fastest airport transfer')..." 
+              autocomplete="off"
+            />
+            <button id="btn-submit-ai" class="btn-submit-ai" title="Ask AI Copilot">Ask AI</button>
+          </div>
+
+          <!-- Quick AI Prompt Presets -->
+          <div class="ai-presets-row">
+            <div class="ai-presets-label">💡 Prompt Ideas:</div>
+            <button class="ai-preset-chip" data-prompt="I am a female student traveling from Rajiv Chowk to Saket at night, suggest safest route">🌸 Safest Female Night Route</button>
+            <button class="ai-preset-chip" data-prompt="Fastest route from Anand Vihar to Airport bypassing road traffic">⚡ Bypass Traffic to Airport</button>
+            <button class="ai-preset-chip" data-prompt="Cheapest way to travel from Kashmere Gate to Nehru Place with student NCMC savings">💰 Cheapest NCMC Student Route</button>
+            <button class="ai-preset-chip" data-prompt="What is the current traffic condition on Ring Road and where is the bottleneck?">🚦 Check Ring Road Bottlenecks</button>
+          </div>
+        </div>
+
+        <!-- AI Real-Time Processing Spinner (Hidden by default) -->
+        <div id="ai-loading-state" class="ai-loading-state" style="display:none;">
+          <div class="ai-pulsing-orb"></div>
+          <div class="ai-loading-text">Analyzing multimodal graph, Bayesian delay distributions, and telemetry...</div>
+        </div>
+
+        <!-- AI Response Container -->
+        <div id="ai-response-container" class="ai-response-container">
+          <!-- Initial Welcome View -->
+          <div class="ai-welcome-box">
+            <div style="font-size:2rem; margin-bottom:6px;">🤖 🇮🇳</div>
+            <div style="font-weight:700; color:var(--text-main); font-size:1.05rem;">How can AI optimize your Delhi commute today?</div>
+            <div style="font-size:0.8rem; color:var(--text-muted); max-width:440px; margin:6px auto 14px; line-height:1.4;">
+              Trained on Delhi Open Transit Data (DTC &amp; DMRC), combining multi-objective Pareto utility scoring with probabilistic congestion forecasting.
+            </div>
+            <div class="ai-capability-grid">
+              <div class="ai-cap-card">
+                <span class="cap-icon">🛡️</span>
+                <strong>Women Safety First</strong>
+                <span>Prioritizes Pink passes, illuminated metro hubs &amp; police stations.</span>
+              </div>
+              <div class="ai-cap-card">
+                <span class="cap-icon">⚡</span>
+                <strong>Bayesian Rush Bypass</strong>
+                <span>Detects road bunching &amp; reroutes via express rail before jams form.</span>
+              </div>
+              <div class="ai-cap-card">
+                <span class="cap-icon">💳</span>
+                <strong>NCMC Fare Optimizer</strong>
+                <span>Calculates monthly savings and cheapest student multimodal fares.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Footer Credentials -->
+        <div class="ai-footer-info">
+          <span>🧠 <strong>First-Year CS AI Architecture:</strong> Token NLP + Dual-Peak Gaussian Diurnal Curve + Multi-Attribute Utility Theory (MAUT).</span>
+        </div>
       </div>
     </div>
   </div>

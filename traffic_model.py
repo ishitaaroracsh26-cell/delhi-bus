@@ -325,18 +325,30 @@ class DelhiBusTrafficModel:
 
                 is_pink = (route.get("mode") == "bus" and ("Electric" in route.get("bus_type", "") or b_idx == 0))
 
+                speed_val = round(speed_kmh * (0.9 + 0.2 * ((b_idx % 3) / 3.0)), 1)
+                speed_stat = "Free-Flow" if speed_val > 25 else ("Heavy Congestion" if speed_val < 12 else "Normal Flow")
+                crowd_lvl = "High" if crowd_pct > 75 else ("Moderate" if crowd_pct > 40 else "Low")
+
                 buses.append({
                     "vehicle_id": vehicle_id,
                     "route_id": r_id,
                     "route_name": route["short_name"],
+                    "route_short_name": route["short_name"],
+                    "agency": route.get("agency", "DTC"),
                     "lat": bus_lat,
                     "lon": bus_lon,
-                    "speed_kmh": round(speed_kmh * (0.9 + 0.2 * ((b_idx % 3) / 3.0)), 1),
+                    "speed_kmh": speed_val,
+                    "current_speed_kmh": speed_val,
+                    "speed_status": speed_stat,
                     "heading": heading,
                     "crowd_percentage": crowd_pct,
-                    "crowd_level": "High" if crowd_pct > 75 else ("Moderate" if crowd_pct > 40 else "Low"),
+                    "crowding_percentage": crowd_pct,
+                    "crowd_level": crowd_lvl,
+                    "crowding_level": crowd_lvl,
+                    "next_stop_name": next_s["name"],
                     "current_segment": f"{curr_s['name']} ➔ {next_s['name']}",
                     "is_saheli_pink": is_pink,
+                    "last_ping_seconds_ago": (epoch_seconds % 12) + 2,
                     "timestamp": epoch_seconds
                 })
 

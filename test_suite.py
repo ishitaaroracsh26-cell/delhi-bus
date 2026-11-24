@@ -331,5 +331,50 @@ class TestRequestHandlerLogic(unittest.TestCase):
         self.assertGreaterEqual(len(bypasses), 1)
         self.assertIn("time_saved_min", bypasses[0])
 
+    def test_ai_nlp_intent_classification(self):
+        from ai_engine import CommuterIntentNLP
+        nlp = CommuterIntentNLP()
+        res = nlp.classify_intent("I am a female student traveling from Rajiv Chowk to Saket at night, please suggest safest route")
+        self.assertEqual(res["primary_intent"], "SAFETY_FIRST")
+        self.assertEqual(res["origin_id"], "RAJIV_CHOWK")
+        self.assertEqual(res["dest_id"], "SAKET")
+        self.assertTrue(res["is_female_context"])
+        self.assertTrue(res["is_night_context"])
+
+    def test_ai_bayesian_congestion_prediction(self):
+        from ai_engine import BayesianCongestionPredictor
+        pred = BayesianCongestionPredictor.predict_all_corridors(18.5)
+        self.assertGreater(len(pred), 5)
+        for c in pred:
+            self.assertIn("jam_probability", c)
+            self.assertIn("predicted_delay_min", c)
+            self.assertIn("risk_level", c)
+
+    def test_ai_multi_objective_ranking(self):
+        from ai_engine import MultiObjectiveRouteScorer
+        scorer = MultiObjectiveRouteScorer()
+        dummy_journeys = [
+            {"journey_id": "J1", "live_duration_min": 50, "fare_inr": 25, "is_saheli_pink": True, "night_safety_rating": 9.5},
+            {"journey_id": "J2", "live_duration_min": 35, "fare_inr": 40, "is_saheli_pink": False, "night_safety_rating": 7.0}
+        ]
+        # Safety intent should rank the Pink bus highest
+        ranked = scorer.rank_journeys(dummy_journeys, {"primary_intent": "SAFETY_FIRST", "is_female_context": True})
+        self.assertEqual(ranked[0]["journey_id"], "J1")
+        self.assertIn("ai_score", ranked[0])
+        self.assertIn("ai_badge", ranked[0])
+
+    def test_ai_copilot_end_to_end(self):
+        from ai_engine import TransitAICopilot
+        from traffic_model import DelhiBusTrafficModel
+        from journey_planner import DelhiJourneyPlanner
+        tm = DelhiBusTrafficModel()
+        jp = DelhiJourneyPlanner(tm)
+        ai = TransitAICopilot(tm, jp)
+        res = ai.process_commuter_query("Fastest route from Anand Vihar to Airport bypassing road traffic")
+        self.assertEqual(res["status"], "success")
+        self.assertIn("ai_summary", res)
+        self.assertIn("recommended_journey", res)
+        self.assertEqual(res["action"]["type"], "NAVIGATE_PLAN")
+
 if __name__ == "__main__":
     unittest.main()

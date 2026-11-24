@@ -27,6 +27,7 @@ from seat_model import (
     generate_bus_seat_layout,
     reserve_bus_seat
 )
+from ai_engine import TransitAICopilot, BayesianCongestionPredictor, MultiObjectiveRouteScorer
 
 BASE_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = BASE_DIR / "public"
@@ -34,6 +35,7 @@ PUBLIC_DIR = BASE_DIR / "public"
 traffic_model = DelhiBusTrafficModel()
 journey_planner = DelhiJourneyPlanner(traffic_model)
 otd_client = DelhiOTDClient()
+ai_copilot = TransitAICopilot(traffic_model, journey_planner)
 SERVER_START_TIME = time.time()
 
 class DilliTransitRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -96,6 +98,11 @@ class DilliTransitRequestHandler(http.server.BaseHTTPRequestHandler):
             self.handle_sos(query, head_only=head_only)
         elif path == "/api/seats":
             self.handle_seats(query, head_only=head_only)
+        # AI Copilot & Predictive Congestion Endpoints
+        elif path == "/api/ai/predict":
+            self.handle_ai_predict(query, head_only=head_only)
+        elif path == "/api/ai/chat":
+            self.handle_ai_chat_get(query, head_only=head_only)
         # 2. Static Web Assets
         else:
             self.serve_static(path, head_only=head_only)
@@ -142,6 +149,10 @@ class DilliTransitRequestHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(200, {"success": True, "reservation": reservation})
             except Exception as e:
                 self.send_json(400, {"success": False, "error": str(e)})
+        elif path == "/api/ai/chat":
+            self.handle_ai_chat_post()
+        elif path == "/api/ai/score-journeys":
+            self.handle_ai_score_journeys()
         else:
             self.send_json(404, {"error": "Endpoint not found"})
 
@@ -191,6 +202,10 @@ class DilliTransitRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         result = journey_planner.plan_journey(origin, destination)
+        if result.get("success") and result.get("journeys"):
+            intent_profile = ai_copilot.nlp.classify_intent(f"from {origin} to {destination}")
+            result["journeys"] = ai_copilot.scorer.rank_journeys(result["journeys"], intent_profile)
+            result["ai_ranking_applied"] = True
         result["data_source"] = otd_client.get_feed_status()
         self.send_json(200 if result.get("success") else 404, result, head_only=head_only)
 
@@ -337,6 +352,62 @@ class DilliTransitRequestHandler(http.server.BaseHTTPRequestHandler):
             is_saheli_pink=is_saheli
         )
         self.send_json(200, {"success": True, "seat_map": layout}, head_only=head_only)
+
+    def handle_ai_predict(self, query: Dict[str, list], head_only: bool = False):
+        hour_val = None
+        if "hour" in query and query["hour"][0]:
+            try:
+                hour_val = float(query["hour"][0])
+            except ValueError:
+                pass
+        predictions = ai_copilot.bayesian.predict_all_corridors(hour_val, traffic_model=traffic_model)
+        self.send_json(200, {
+            "status": "success",
+            "evaluated_hour": hour_val or round(time.localtime().tm_hour + time.localtime().tm_min / 60.0, 2),
+            "corridors_count": len(predictions),
+            "predictions": predictions,
+            "timestamp": time.time()
+        }, head_only=head_only)
+
+    def handle_ai_chat_get(self, query: Dict[str, list], head_only: bool = False):
+        q = query.get("q", [""])[0]
+        origin = query.get("origin", [None])[0]
+        dest = query.get("destination", [None])[0]
+        gemini_key = query.get("api_key", [None])[0] or self.headers.get("X-Gemini-Key")
+        res = ai_copilot.process_commuter_query(q, active_origin=origin, active_dest=dest, gemini_api_key=gemini_key)
+        self.send_json(200, res, head_only=head_only)
+
+    def handle_ai_chat_post(self):
+        content_length = int(self.headers.get("Content-Length", 0))
+        post_body = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_body.decode("utf-8")) if post_body else {}
+            q = data.get("query") or data.get("q") or ""
+            origin = data.get("origin")
+            dest = data.get("destination")
+            gemini_key = data.get("api_key") or self.headers.get("X-Gemini-Key")
+            res = ai_copilot.process_commuter_query(q, active_origin=origin, active_dest=dest, gemini_api_key=gemini_key)
+            self.send_json(200, res)
+        except Exception as e:
+            self.send_json(400, {"status": "error", "message": str(e)})
+
+    def handle_ai_score_journeys(self):
+        content_length = int(self.headers.get("Content-Length", 0))
+        post_body = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_body.decode("utf-8")) if post_body else {}
+            journeys = data.get("journeys", [])
+            query_str = data.get("query", "general transit plan")
+            intent = ai_copilot.nlp.classify_intent(query_str)
+            ranked = ai_copilot.scorer.rank_journeys(journeys, intent)
+            self.send_json(200, {
+                "status": "success",
+                "ranked_journeys": ranked,
+                "intent": intent["primary_intent"],
+                "confidence": intent["confidence"]
+            })
+        except Exception as e:
+            self.send_json(400, {"status": "error", "message": str(e)})
 
     def serve_static(self, path: str, head_only: bool = False):
         if path == "/" or not path:
